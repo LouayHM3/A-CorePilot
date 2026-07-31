@@ -1,0 +1,30 @@
+# ─── Node ───────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Build Outputs ──────────────────────────────────────────────────
+dist/
+out/
+
+# ─── VS Code Extension ──────────────────────────────────────────────
+*.vsix
+
+# ─── Webview Build Cache ─────────────────────────────────────────────
+webview-ui/dist/
+webview-ui/node_modules/
+
+# ─── A-CorePilot Runtime Data (per-workspace, gitignored by design) ──
+.corepilot/
+
+# ─── OS ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Editor ─────────────────────────────────────────────────────────
+.vscode/settings.json
+*.log
+
+# ─── TypeScript ─────────────────────────────────────────────────────
+*.tsbuildinfo

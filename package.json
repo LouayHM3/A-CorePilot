@@ -1,0 +1,153 @@
+{
+  "name": "a-corepilot",
+  "publisher": "corepilot-dev",
+  "displayName": "A-CorePilot",
+  "description": "SAP Clean Core Migration Assistant",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:corepilotSidebar",
+    "onCommand:corepilot.openDashboard",
+    "onCommand:corepilot.startScan",
+    "onCommand:corepilot.testSapConnection",
+    "onCommand:corepilot.testAiCoreConnection"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "corepilot",
+          "title": "A-CorePilot",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "corepilot": [
+        {
+          "id": "corepilotSidebar",
+          "name": "SAP Objects"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "corepilot.openDashboard",
+        "title": "Open Dashboard",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "corepilot.startScan",
+        "title": "Start Scan",
+        "icon": "$(search-refresh)"
+      },
+      {
+        "command": "corepilot.testSapConnection",
+        "title": "Test SAP Connection"
+      },
+      {
+        "command": "corepilot.testAiCoreConnection",
+        "title": "Test AI Core Connection"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "corepilot.startScan",
+          "when": "view == corepilotSidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "corepilot.openDashboard",
+          "when": "view == corepilotSidebar",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "A-CorePilot",
+      "properties": {
+        "corepilot.sap.host": {
+          "type": "string",
+          "description": "SAP host URL"
+        },
+        "corepilot.sap.client": {
+          "type": "string",
+          "default": "100",
+          "description": "SAP Client"
+        },
+        "corepilot.sap.username": {
+          "type": "string",
+          "description": "SAP Username"
+        },
+        "corepilot.sap.targetRelease": {
+          "type": "string",
+          "default": "2023",
+          "description": "Target S/4HANA Release"
+        },
+        "corepilot.sap.atcVariant": {
+          "type": "string",
+          "default": "ZABAP_CLOUD_DEV_DEFAULT",
+          "description": "Custom ATC Check Variant"
+        },
+        "corepilot.aicore.tokenUrl": {
+          "type": "string",
+          "description": "SAP AI Core Token URL"
+        },
+        "corepilot.aicore.clientId": {
+          "type": "string",
+          "description": "SAP AI Core Client ID"
+        },
+        "corepilot.aicore.apiBase": {
+          "type": "string",
+          "description": "SAP AI Core API Base URL"
+        },
+        "corepilot.aicore.deploymentId": {
+          "type": "string",
+          "description": "SAP AI Core Deployment ID"
+        },
+        "corepilot.aicore.resourceGroup": {
+          "type": "string",
+          "default": "default",
+          "description": "SAP AI Core Resource Group"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run build:webview && webpack",
+    "build:webview": "npm --prefix webview-ui run build",
+    "watch": "webpack --watch",
+    "package": "npm run build:webview && webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "test:graph": "npm run compile-tests && node --test out/test/graph/DependencyGraph.test.js",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.1",
+    "@typescript-eslint/parser": "^7.1.1",
+    "@vscode/test-cli": "^0.0.6",
+    "@vscode/test-electron": "^2.3.9",
+    "eslint": "^8.57.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.3",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.9.3"
+  }
+}
