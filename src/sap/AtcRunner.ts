@@ -3,7 +3,7 @@ import { AtcFinding } from './ObjectDiscovery';
 import { XMLParser } from 'fast-xml-parser';
 
 const POLL_INTERVAL_MS = 3000;
-const MAX_POLL_ATTEMPTS = 40; // 2 minutes max
+const MAX_POLL_ATTEMPTS = 20; // 1 minute max per standalone object
 
 // When SAP returns a zero-GUID runId it means the run was processed
 // synchronously against the persistent global worklist. However, heavy
@@ -13,7 +13,7 @@ const MAX_POLL_ATTEMPTS = 40; // 2 minutes max
 // until findings for the target object actually appear — or until timeout.
 const ZERO_GUID_INITIAL_WAIT_MS  = 6000;  // initial grace period before first fetch
 const ZERO_GUID_RETRY_INTERVAL_MS = 5000;  // interval between retries
-const ZERO_GUID_MAX_RETRIES       = 12;    // max 60 s of retrying (12 × 5 s)
+const ZERO_GUID_MAX_RETRIES       = 4;     // max 20 s after the initial wait
 
 // ── XML attribute helper ──────────────────────────────────────────────────────
 
@@ -295,19 +295,8 @@ function parseFindings(xml: string, filterObjectName?: string): AtcFinding[] {
     return [];
   }
 
-  // Dump full XML for debugging
-  try {
-    const fs = require('fs');
-    const safeName = (filterObjectName || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const dumpPath = `C:\\Users\\YassmineMessaoudi\\Desktop\\A-CorePilot\\atc_dump_${safeName}.xml`;
-    fs.writeFileSync(dumpPath, xml);
-    console.log(`[ATC Parser] Dumped full XML to ${dumpPath}`);
-  } catch(e) {
-    console.error('Failed to dump XML', e);
-  }
-
-  // Log raw XML prefix for debugging (first 2000 chars)
-  console.log(`[ATC Parser] Raw XML preview (first 2000 chars):\n${xml.substring(0, 2000)}`);
+  // Keep production logs bounded; full ATC responses can be very large.
+  console.log(`[ATC Parser] Raw XML preview: ${xml.substring(0, 400)}`);
 
   // SAP returns checkstyle format when Accept falls back to application/xml or */*
   if (xml.includes('<checkstyle')) {
@@ -442,6 +431,9 @@ export class AtcRunner {
 
     // Prefer the result worklist from the run body over the pre-created worklist
     const findingsWorklistId = resultWorklistId || worklistId;
+    // A dedicated worklist belongs only to this run, so retain findings from
+    // included child objects too. Filter by name only for the shared fallback.
+    const findingsFilter = findingsWorklistId ? undefined : objectName;
 
     if (isZeroGuid) {
       for (let retry = 0; retry <= ZERO_GUID_MAX_RETRIES; retry++) {
@@ -451,7 +443,7 @@ export class AtcRunner {
           throw new Error(`Failed to fetch ATC findings for ${objectName}: ${e.message}`);
         }
 
-        findings = parseFindings(xml, objectName);
+        findings = parseFindings(xml, findingsFilter);
         console.log(`[ATC] Zero-GUID retry ${retry}/${ZERO_GUID_MAX_RETRIES}: ${findings.length} findings for ${objectName}`);
 
         if (findings.length > 0) {
@@ -459,7 +451,7 @@ export class AtcRunner {
           await sleep(ZERO_GUID_RETRY_INTERVAL_MS);
           try {
             xml = await this.client.getAtcFindings(runId, findingsWorklistId);
-            findings = parseFindings(xml, objectName);
+            findings = parseFindings(xml, findingsFilter);
           } catch (_) { /* keep what we already have */ }
           break;
         }
@@ -477,7 +469,7 @@ export class AtcRunner {
       } catch (e: any) {
         throw new Error(`Failed to fetch ATC findings for ${objectName}: ${e.message}`);
       }
-      findings = parseFindings(xml, objectName);
+      findings = parseFindings(xml, findingsFilter);
     }
 
     console.log(`[ATC] Successfully parsed ${findings.length} findings for ${objectName}`);

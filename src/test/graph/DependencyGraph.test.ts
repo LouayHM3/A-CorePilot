@@ -43,7 +43,10 @@ test('builds graph edges, metrics, cycles, and critical path', () => {
     sapObject({
       name: 'ZCL_ORDER_SERVICE',
       debtScore: 42,
-      callers: [{ name: 'ZREP_ORDER_UI', type: 'PROG' }],
+      callers: [
+        { name: 'ZREP_ORDER_UI', type: 'PROG', source: 'SAP_CROSSREF' },
+        { name: 'ZCL_ORDER_REPO', type: 'CLAS', source: 'SAP_CROSSREF' },
+      ],
       dependencies: [
         { name: 'ZCL_ORDER_REPO', type: 'CLAS', kind: 'CALLS', source: 'SOURCE_PATTERN', confidence: 'high' },
         { name: 'ZORDER_TABLE', type: 'TABL', kind: 'USES_TABLE', source: 'SOURCE_PATTERN', confidence: 'medium' },
@@ -51,6 +54,7 @@ test('builds graph edges, metrics, cycles, and critical path', () => {
     }),
     sapObject({
       name: 'ZCL_ORDER_REPO',
+      callers: [{ name: 'ZCL_ORDER_SERVICE', type: 'CLAS', source: 'SAP_CROSSREF' }],
       dependencies: [
         { name: 'ZCL_ORDER_SERVICE', type: 'CLAS', kind: 'CALLS', source: 'SOURCE_PATTERN', confidence: 'high' },
       ],
@@ -66,7 +70,7 @@ test('builds graph edges, metrics, cycles, and critical path', () => {
   assert.equal(json.stats.cycleCount, 1);
   assert.equal(json.topologicalOrder.length, 4);
   assert.ok(json.criticalPath.length >= 2);
-  assert.equal(objects[0].calleeCount, 2);
+  assert.equal(objects[0].calleeCount, 1);
   assert.equal(objects[0].callerCount, 2);
   assert.equal(objects[0].graphDepth, 2);
   assert.ok(json.edges.some(edge => edge.cycle));
@@ -106,6 +110,103 @@ test('merges ATC evidence into an existing edge and upgrades confidence', () => 
   assert.equal(edge?.validatedByAtc, true);
   assert.deepEqual(edge?.sourceTypes.sort(), ['ATC_FINDING', 'SOURCE_PATTERN']);
   assert.equal(edge?.evidence.length, 2);
+});
+
+test('counts a main program as an incoming user of its includes', () => {
+  const objects = [
+    sapObject({
+      name: 'ZCAP_1',
+      type: 'PROG/P',
+      dependencies: [
+        { name: 'ZCAP_1_TOP', type: 'PROG', kind: 'INCLUDES', source: 'SOURCE_PATTERN', confidence: 'high' },
+      ],
+    }),
+    sapObject({
+      name: 'ZCAP_1_TOP',
+      type: 'PROG/I',
+      callerScanStatus: 'success',
+      callers: [{ name: 'ZCAP_1', type: 'PROG', kind: 'INCLUDES', source: 'SAP_CROSSREF' }],
+    }),
+  ];
+
+  const graph = DependencyGraph.fromObjects(objects);
+  graph.applyMetricsToObjects(objects);
+
+  assert.equal(objects[1].callerCount, 1);
+  assert.deepEqual(graph.impactOf('PROG::ZCAP_1_TOP'), ['PROG::ZCAP_1']);
+});
+
+test('does not retain an anonymous caller count without an incoming edge', () => {
+  const objects = [sapObject({
+    name: 'ZABAPGIT_STANDALONE',
+    type: 'PROG/P',
+    callerCount: 1,
+    callers: [],
+  })];
+
+  const graph = DependencyGraph.fromObjects(objects);
+  graph.applyMetricsToObjects(objects);
+  const json = graph.toJSON();
+
+  assert.equal(objects[0].callerCount, 0);
+  assert.equal(json.nodes[0].callerCount, 0);
+  assert.equal(json.edges.filter(edge => edge.target === 'PROG::ZABAPGIT_STANDALONE').length, 0);
+});
+
+test('keeps source and ADT relations as candidates outside production metrics', () => {
+  const objects = [
+    sapObject({
+      name: 'ZCL_SOURCE',
+      callers: [{ name: 'ZREP_ADT_USER', type: 'PROG', source: 'ADT_WHERE_USED' }],
+      dependencies: [
+        { name: 'ZCL_TARGET', type: 'CLAS', kind: 'CALLS', source: 'SOURCE_PATTERN', confidence: 'high' },
+      ],
+    }),
+    sapObject({ name: 'ZCL_TARGET' }),
+  ];
+
+  const graph = DependencyGraph.fromObjects(objects);
+  graph.applyMetricsToObjects(objects);
+  const json = graph.toJSON();
+
+  assert.equal(objects[0].callerCount, 0);
+  assert.equal(objects[0].calleeCount, 0);
+  assert.equal(json.edges.filter(edge => edge.verified).length, 0);
+  assert.equal(json.edges.length, 2);
+});
+
+test('models BAdI metadata and implemented interfaces with correct direction', () => {
+  const source = 'CLASS zcl_im_mb_res_bapi_create1 DEFINITION. PUBLIC SECTION. INTERFACES if_ex_mb_res_bapi_create1. ENDCLASS.';
+  const objects = [sapObject({
+    name: 'ZCL_IM_MB_RES_BAPI_CREATE1',
+    type: 'CLAS/OC',
+    description: 'Imp. class for BAdI imp. ZMB_RES_BAPI_CREATE1',
+    dependencies: extractSourceDependencies(source, 'ZCL_IM_MB_RES_BAPI_CREATE1'),
+  })];
+
+  const graph = DependencyGraph.fromObjects(objects);
+  graph.applyMetricsToObjects(objects);
+  const json = graph.toJSON();
+
+  assert.ok(json.edges.some(edge => edge.source === 'BADI::ZMB_RES_BAPI_CREATE1' && edge.target === 'CLAS::ZCL_IM_MB_RES_BAPI_CREATE1' && edge.kind === 'BADI_IMPLEMENTATION'));
+  assert.ok(json.edges.some(edge => edge.source === 'CLAS::ZCL_IM_MB_RES_BAPI_CREATE1' && edge.target === 'INTF::IF_EX_MB_RES_BAPI_CREATE1' && edge.kind === 'IMPLEMENTS'));
+  // Description/source inference remains visible, but does not affect
+  // production metrics until SAP metadata resolves both relations.
+  assert.equal(objects[0].callerCount, 0);
+  assert.equal(objects[0].calleeCount, 0);
+  assert.equal(objects[0].impactCount, 0);
+  assert.ok(json.edges.every(edge => edge.verified === false));
+});
+
+test('ignores ATC locations that point to a subobject of self', () => {
+  const dependencies = extractAtcDependencies([{
+    checkId: 'TEST',
+    priority: 2,
+    message: 'Finding in ZCL_IM_MB_RES_BAPI_CREATE1/SOME_METHOD',
+    location: 'ZCL_IM_MB_RES_BAPI_CREATE1/SOME_METHOD',
+  }], 'ZCL_IM_MB_RES_BAPI_CREATE1');
+
+  assert.equal(dependencies.length, 0);
 });
 
 test('extracts common ABAP source dependencies', () => {

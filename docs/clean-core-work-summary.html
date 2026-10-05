@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Rapport A-CorePilot et Clean Core ABAP</title>
+<style>
+@page{size:A4;margin:16mm}*{box-sizing:border-box}body{margin:0;color:#172033;font:10pt/1.45 "Segoe UI",Arial,sans-serif}h1{margin:0 0 5mm;color:#0a6ed1;font-size:25pt;line-height:1.12}h2{margin:8mm 0 3mm;padding-bottom:1.5mm;color:#0a6ed1;font-size:15pt;border-bottom:1px solid #bfd7ee;break-after:avoid}h3{margin:5mm 0 2mm;color:#243a54;font-size:11.5pt;break-after:avoid}p{margin:0 0 3mm}ul,ol{margin:2mm 0 4mm 6mm;padding-left:5mm}li{margin-bottom:1.2mm}code{padding:.2mm 1mm;border-radius:2px;background:#eef3f8;font-family:Consolas,monospace}pre{margin:3mm 0 4mm;padding:3mm;border-left:3px solid #0a6ed1;background:#f4f7fa;font:8.2pt/1.38 Consolas,monospace;white-space:pre-wrap;break-inside:avoid}table{width:100%;margin:3mm 0 5mm;border-collapse:collapse;font-size:8.8pt;break-inside:avoid}th{background:#0a6ed1;color:#fff;text-align:left}th,td{padding:1.8mm;border:1px solid #c9d4df;vertical-align:top}tr:nth-child(even) td{background:#f7f9fb}.cover{height:258mm;display:flex;flex-direction:column;justify-content:center;page-break-after:always}.subtitle{margin-bottom:12mm;color:#44566c;font-size:15pt}.meta{padding:5mm 6mm;border-left:4px solid #0a6ed1;background:#f3f8fc}.note,.success,.warning{margin:4mm 0;padding:3mm 4mm;break-inside:avoid}.note{border-left:4px solid #0a6ed1;background:#eef6ff}.success{border-left:4px solid #2b7d2b;background:#edf8ef}.warning{border-left:4px solid #e6a700;background:#fff6d9}.page-break{page-break-before:always}.small{color:#617184;font-size:8.5pt}.flow{margin:4mm 0;padding:4mm;border:1px solid #bfd7ee;background:#f8fbfe;text-align:center;font-weight:600;break-inside:avoid}
+</style></head><body>
+<section class="cover"><h1>Rapport de projet<br>A-CorePilot &amp; Clean Core ABAP</h1><div class="subtitle">Analyse du patrimoine ABAP et refactorisation du report ALV ZPROG_ALV_YME</div><div class="meta"><p><strong>Projet :</strong> extension VS Code A-CorePilot</p><p><strong>Exercice :</strong> migration progressive Clean Core d’un report ALV classique</p><p><strong>Copie de travail :</strong> ZPROG_ALV_YME_CC</p><p><strong>Date :</strong> 11 septembre 2026</p><p><strong>Contexte :</strong> travail d’exploration encadré avec validation dans SAP Logon</p></div></section>
+
+<h2>1. Résumé exécutif</h2>
+<p>Le travail a porté sur deux axes. Le premier consistait à rendre A-CorePilot capable d’inventorier les objets Z/Y, d’exécuter ATC et de construire un graphe dont les compteurs sont traçables. Le second consistait à appliquer une démarche Clean Core à un report ALV existant sans modifier directement l’original.</p>
+<ul><li>Distinction entre un résultat where-used vide et une analyse échouée ou non supportée.</li><li>Provider ABAP autour de <code>RS_EU_CROSSREF</code> pour obtenir des callers identifiables.</li><li>Métriques du graphe calculées uniquement depuis les relations <code>SAP_CROSSREF</code>.</li><li>Résultats regex, ATC, ADT générique et LLM conservés comme candidats.</li><li>Classification R₅ déterministe, explicable et sans LLM.</li><li>Copie, stabilisation et refactorisation du report ALV.</li><li>Recherche d’APIs Released et confinement des accès fiscaux legacy derrière un wrapper.</li></ul>
+
+<h2>2. Problèmes initiaux dans A-CorePilot</h2>
+<ul><li>Des includes <code>PROG/I</code> affichaient zéro caller alors que leur programme principal les incluait.</li><li>Un zéro pouvait aussi représenter un appel SAP échoué ou une réponse inutilisable.</li><li>Des composants techniques de classes étaient comptés comme callers de leur propre classe.</li><li>Les relations incoming/outgoing ne correspondaient pas toujours à SAP GUI.</li><li>Le graphe pouvait sembler vide après navigation malgré sa persistance.</li><li>ATC sur près de cent objets rendait le scan long et vulnérable aux interruptions.</li></ul>
+<table><tr><th>Affichage</th><th>Signification adoptée</th></tr><tr><td><strong>0</strong></td><td>La recherche SAP a réussi et aucune relation vérifiée n’a été trouvée.</td></tr><tr><td><strong>—</strong></td><td>Valeur inconnue : type non supporté, appel échoué, réponse inutilisable ou scan non terminé.</td></tr><tr><td><strong>n &gt; 0</strong></td><td>Nombre d’objets utilisateurs uniques associés à des relations SAP vérifiées.</td></tr></table>
+<div class="warning"><strong>Principe :</strong> l’absence de preuve n’est pas une preuve d’absence. Un échec ne doit jamais être converti en zéro.</div>
+
+<h2>3. Provider ABAP de dépendances</h2>
+<p>Le where-used ADT générique n’étant pas cohérent pour tous les types techniques, une interface et une classe provider ont été créées côté SAP autour de <code>RS_EU_CROSSREF</code>.</p>
+<div class="flow">A-CorePilot → /zacore/dependencies → ZCL_ACORE_DEPENDENCY_HTTP → ZCL_ACORE_DEPENDENCY_SAP → RS_EU_CROSSREF</div>
+<p>L’interface <code>ZIF_ACORE_DEPENDENCY_PROVIDER</code> expose <code>GET_USED_BY</code> avec le nom et la classe de l’objet en entrée, puis les relations, le statut, le message et le compteur en sortie.</p>
+<pre>CALL FUNCTION 'RS_EU_CROSSREF'
+  EXPORTING
+    i_find_obj_cls = lv_object_class
+    no_dialog      = 'X'
+  TABLES
+    i_findstrings  = lt_findstrings
+    o_founds       = lt_founds.</pre>
+<p>Les résultats <code>RSFINDLST</code> sont normalisés, les préfixes comme <code>\IC:</code> sont retirés, puis les relations sont dédupliquées par source, cible, classes et nature. Le compteur est le nombre de sources uniques et non le nombre brut d’occurrences.</p>
+<table><tr><th>Objet testé</th><th>Classe</th><th>Résultat observé</th></tr><tr><td>ZCAP_1_TOP, ZCAP_1_SS, ZCAP_1_CLA</td><td>REPS</td><td>Un report parent vérifié pour chaque include.</td></tr><tr><td>ZCL_ZAJ_BIAT_RESERVATI_DPC</td><td>CLAS</td><td>Trois utilisateurs uniques pendant le test.</td></tr><tr><td>ZCL_ACCESS_PAYMENTS</td><td>CLAS</td><td>Composants générés internes éliminés du compteur métier.</td></tr></table>
+
+<h2>4. Graphe de dépendances fiable</h2>
+<table><tr><th>Catégorie</th><th>Sources</th><th>Effet</th></tr><tr><td>SAP Verified</td><td><code>SAP_CROSSREF</code></td><td>Alimente Where Used, Dependencies, Total Impact, Depth, cycles et chemins.</td></tr><tr><td>Candidate</td><td>Regex, ATC, ADT générique, métadonnées ou LLM</td><td>Visible sur demande, mais n’augmente aucun compteur de production.</td></tr></table>
+<ul><li><strong>Where Used / incoming :</strong> objets qui utilisent l’objet sélectionné.</li><li><strong>Dependencies / outgoing :</strong> objets utilisés par l’objet sélectionné.</li><li><strong>Total Impact :</strong> ensemble transitif des utilisateurs vérifiés susceptibles d’être affectés.</li></ul>
+<p>L’option <em>Candidate edges</em> est désactivée par défaut. Le cache et le graphe sont versionnés, écrits atomiquement et sauvegardés par checkpoints <code>partial</code>. Un seul scan peut fonctionner à la fois et les erreurs inattendues sont remontées dans l’interface.</p>
+
+<h2>5. Classification R₅ sans LLM</h2>
+<p>La classification LLM a été remplacée par des règles déterministes basées sur les métadonnées SAP, les findings ATC, le code ABAP et les conventions de nommage. Chaque décision conserve son type, sa confiance, sa source et sa preuve.</p>
+<table><tr><th>Type</th><th>Exemples de preuve</th><th>Risque</th></tr><tr><td>CLASSICAL_MODIFICATION</td><td>Finding ATC de modification directe</td><td>1,00</td></tr><tr><td>IMPLICIT_ENHANCEMENT</td><td>Métadonnée/finding « implicit enhancement »</td><td>0,85</td></tr><tr><td>EXPLICIT_ENHANCEMENT</td><td>ENHANCEMENT-POINT ou ENHANCEMENT-SECTION</td><td>0,70</td></tr><tr><td>BADI_IMPLEMENTATION</td><td>IF_EX_*, GET BADI, CALL BADI</td><td>0,55</td></tr><tr><td>CUSTOM_DEVELOPMENT</td><td>Objet Z/Y sans preuve plus forte</td><td>0,30</td></tr><tr><td>WRAPPER_PROXY</td><td>Wrapper/Proxy/Adapter/Façade avec délégation</td><td>0,15</td></tr></table>
+<p>La colonne <strong>R5 Type</strong> est disponible dans Object Inventory. Son infobulle affiche la provenance et la preuve.</p>
+
+<div class="page-break"></div><h2>6. Exercice Clean Core sur le report ALV</h2>
+<h3>6.1 État initial et baseline ATC</h3>
+<p><code>ZPROG_ALV_YME</code> utilisait un ALV classique, des structures <code>SLIS_*</code>, des textes codés en dur, des <code>SELECT SINGLE</code> et des accès directs à BKPF, BSEG, EKPO, T030K, A003 et KONP. ATC signalait des APIs internes/classiques, lectures DDIC, sélections potentiellement non uniques et éléments de texte manquants.</p>
+
+<h3>6.2 Protection du programme original</h3>
+<p>Une copie cohérente a été créée avec Source, Text Elements et Includes :</p>
+<pre>ZPROG_ALV_YME_CC
+ZPROG_ALV_YME_CC_TOP
+ZPROG_ALV_YME_CC_SS
+ZPROG_ALV_YME_CC_CLA</pre>
+<p>L’original est resté la référence fonctionnelle. La gestion des versions SAP a été utilisée pour comparer la version active et les versions locales.</p>
+
+<h3>6.3 Structure et corrections syntaxiques</h3>
+<pre>REPORT zprog_alv_yme_cc.
+INCLUDE zprog_alv_yme_cc_top.
+INCLUDE zprog_alv_yme_cc_ss.
+INCLUDE zprog_alv_yme_cc_cla.
+
+INITIALIZATION.
+  CREATE OBJECT go_report.
+START-OF-SELECTION.
+  go_report->get_data( ).
+  go_report->show_alv( ).</pre>
+<ul><li>Ajout de <code>CLASS lcl_report DEFINITION DEFERRED.</code> avant la référence à la classe.</li><li>Correction des blocs DATA, virgules et points.</li><li>Déclaration publique des méthodes appelées.</li><li>Suppression de l’événement inexistant <code>PF_STATUS_SET</code> sur <code>CL_GUI_ALV_GRID</code>.</li><li>Activation des includes avant le programme principal.</li></ul>
+<div class="success"><strong>Résultat :</strong> « No syntax errors found in Report ZPROG_ALV_YME_CC », puis affichage de l’écran de sélection avec F8.</div>
+
+<h3>6.4 Text Pool</h3>
+<p>Les chaînes visibles ont été externalisées dans les Text Symbols 001 à 024 : titres des blocs, messages « Aucune donnée trouvée » et « Erreur lors de l’affichage ALV », ainsi que les titres des colonnes comptables et fiscales.</p>
+<pre>MESSAGE text-003 TYPE 'S' DISPLAY LIKE 'E'.</pre>
+<p>Le Text Pool a été enregistré et activé en français avant de relancer ATC.</p>
+
+<h3>6.5 Modernisation de l’ALV</h3>
+<p>Les appels <code>REUSE_ALV_*</code> et les structures <code>SLIS_*</code> ont été retirés au profit de SALV :</p>
+<pre>DATA lo_alv TYPE REF TO cl_salv_table.
+cl_salv_table=>factory(
+  IMPORTING r_salv_table = lo_alv
+  CHANGING  t_table      = mt_result ).
+lo_alv->get_columns( )->set_optimize( abap_true ).
+lo_alv->get_functions( )->set_all( abap_true ).
+lo_alv->display( ).</pre>
+<div class="note">SALV modernise l’affichage SAP GUI. Une cible ABAP Cloud stricte peut toutefois nécessiter RAP/Fiori.</div>
+
+<h2>7. Recherche des APIs Released</h2>
+<table><tr><th>Objet interne</th><th>Successeur étudié</th><th>Conclusion</th></tr><tr><td>BKPF</td><td>I_JournalEntry</td><td>Released ; sémantique à valider.</td></tr><tr><td>BSEG</td><td>I_OperationalAcctgDocItem</td><td>Released ; candidat pour les postes comptables.</td></tr><tr><td>EKPO</td><td>I_PurchaseOrderItemAPI01</td><td>Released ; candidat pour les postes de commande.</td></tr><tr><td>KONP</td><td>I_SlsPrcgConditionRecord</td><td>Released, mais aucune valeur exploitable pour le test fiscal.</td></tr><tr><td>T030K / A003</td><td>Aucun successeur confirmé</td><td>Accès legacy isolé et documenté.</td></tr></table>
+<p>Un successeur proposé dans le Cloudification Repository n’est pas automatiquement équivalent. Les champs, filtres, cardinalités et données ont été vérifiés dans le système réel.</p>
+
+<h2>8. Wrapper fiscal</h2>
+<div class="flow">ZPROG_ALV_YME_CC → ZIF_YME_TAX_PROVIDER → ZCL_YME_TAX_LEGACY → T030K / A003 / KONP</div>
+<h3>8.1 Interface</h3>
+<pre>INTERFACE zif_yme_tax_provider PUBLIC.
+  METHODS get_tax_data
+    IMPORTING iv_tax_code       TYPE mwskz
+    EXPORTING ev_tax_account    TYPE saknr
+              ev_tax_rate       TYPE kbetr
+              ev_account_found  TYPE abap_bool
+              ev_rate_found     TYPE abap_bool.
+ENDINTERFACE.</pre>
+<h3>8.2 Implémentation legacy</h3>
+<pre>METHOD zif_yme_tax_provider~get_tax_data.
+  CLEAR: ev_tax_account, ev_tax_rate,
+         ev_account_found, ev_rate_found.
+
+  SELECT SINGLE konts FROM t030k
+    WHERE ktopl = 'MXCA' AND ktosl = 'VST'
+      AND land1 = 'TN' AND mwskz = @iv_tax_code
+    INTO @ev_tax_account.
+  IF sy-subrc = 0. ev_account_found = abap_true. ENDIF.
+
+  SELECT SINGLE knumh FROM a003
+    WHERE kappl = 'TX' AND kschl = 'MWVS'
+      AND aland = 'TN' AND mwskz = @iv_tax_code
+    INTO @DATA(lv_knumh).
+  IF sy-subrc &lt;&gt; 0. RETURN. ENDIF.
+
+  SELECT SINGLE kbetr FROM konp
+    WHERE knumh = @lv_knumh AND kopos = '01'
+    INTO @DATA(lv_rate).
+  IF sy-subrc = 0.
+    ev_tax_rate = lv_rate / 10.
+    ev_rate_found = abap_true.
+  ENDIF.
+ENDMETHOD.</pre>
+<h3>8.3 Wrapper comparé à une classe simple</h3>
+<table><tr><th>Critère</th><th>Classe couplée directement</th><th>Wrapper avec interface</th></tr><tr><td>Dépendance du report</td><td>Tables SAP internes</td><td>Contrat ZIF_YME_TAX_PROVIDER</td></tr><tr><td>Dette technique</td><td>Dispersée</td><td>Confinée dans ZCL_YME_TAX_LEGACY</td></tr><tr><td>Test</td><td>Difficile à isoler</td><td>Provider testable séparément</td></tr><tr><td>Remplacement futur</td><td>Modification du report</td><td>Nouvelle implémentation de l’interface</td></tr><tr><td>Clean Core strict</td><td>Non</td><td>Pas encore, mais dette localisée</td></tr></table>
+<div class="warning"><strong>Limite :</strong> un wrapper ne rend pas une table interne Released. Il confine la dette jusqu’à la disponibilité d’une API officielle compatible.</div>
+
+<h3>8.4 Test fonctionnel</h3>
+<p><code>GET_TAX_DATA</code> a été exécutée dans SE24 avec <code>IV_TAX_CODE = D1</code> :</p>
+<pre>EV_TAX_ACCOUNT   = 4366100000
+EV_TAX_RATE      = 18,00
+EV_ACCOUNT_FOUND = X
+EV_RATE_FOUND    = X</pre>
+<p>Le résultat a été comparé aux données de T030K, A003 et KONP afin de préserver le comportement métier.</p>
+
+<h2>9. Méthode de validation</h2>
+<ol><li>Contrôle syntaxique et activation de tous les includes.</li><li>Exécution de l’original et de la copie avec les mêmes critères.</li><li>Comparaison du nombre de lignes, des clés, du compte TVA et du taux.</li><li>Relance ATC après chaque groupe de changements.</li><li>Test des CDS Released dans le système sans supposer leur équivalence.</li><li>Vérification d’un échantillon Where Used dans SAP GUI.</li><li>Dans A-CorePilot, validation avec <em>Candidate edges</em> désactivé.</li><li>Conservation des captures avant/après et justification des exceptions.</li></ol>
+
+<h2>10. Tests du projet</h2>
+<pre>npm run compile
+npm run test:graph</pre>
+<p>La dernière validation réalisée pendant le développement comptait 16 tests réussis et aucun échec. Les scénarios couvrent les includes, les callers anonymes rejetés, les candidats exclus des métriques, les BAdI, ATC et les catégories R₅.</p>
+
+<h2>11. Bilan avant / après</h2>
+<table><tr><th>Avant</th><th>Après</th></tr><tr><td>Zéro ambigu en cas d’échec</td><td>Zéro réservé au succès vide ; tiret pour inconnu</td></tr><tr><td>Sources mélangées</td><td>Métriques uniquement SAP_CROSSREF</td></tr><tr><td>Regex considérée comme vérité</td><td>Regex conservée comme candidate</td></tr><tr><td>Ancien cache potentiellement affiché</td><td>Cache versionné, atomique et checkpoints</td></tr><tr><td>R₅ basé sur LLM</td><td>R₅ déterministe avec preuve</td></tr><tr><td>Original modifié directement</td><td>Copie ZPROG_ALV_YME_CC isolée</td></tr><tr><td>ALV classique et SLIS</td><td>SALV pour la modernisation SAP GUI</td></tr><tr><td>Textes codés en dur</td><td>Text Symbols français</td></tr><tr><td>Accès fiscaux dispersés</td><td>Confinés dans ZCL_YME_TAX_LEGACY</td></tr></table>
+
+<h2>12. Limites et prochaines étapes</h2>
+<ul><li>La précision dépend des index cross-reference du système SAP.</li><li>Les dépendances dynamiques ne sont pas toutes détectables statiquement.</li><li>Le scan est limité à 100 objets pour maîtriser la durée.</li><li>Les tables du wrapper doivent être remplacées lorsqu’une API Released compatible apparaît.</li><li>Les objets de production doivent quitter <code>$TMP</code> et rejoindre un package transportable.</li><li>Une cible stricte doit étudier RAP/Fiori et les contraintes ABAP Cloud.</li></ul>
+
+<div class="page-break"></div><h2>13. Architecture technique détaillée d’A-CorePilot</h2>
+<p>A-CorePilot est une extension VS Code organisée en couches. Cette séparation évite que l’interface utilisateur connaisse les détails des protocoles SAP et permet de tester les règles métier indépendamment du webview.</p>
+<table><tr><th>Couche</th><th>Responsabilité</th><th>Principaux composants</th></tr><tr><td>Présentation</td><td>Inventaire, progression du scan, graphes, filtres et détails.</td><td>ObjectInventory, DependencyGraphView, SidebarProvider</td></tr><tr><td>Orchestration</td><td>Enchaînement des phases, gestion des erreurs et sauvegardes.</td><td>ScannerAgent, DashboardPanel</td></tr><tr><td>Analyse</td><td>ATC, dette, classification R5 et enrichissement.</td><td>AtcAgent, DebtAnalystAgent, ModificationTypeClassifier</td></tr><tr><td>Découverte SAP</td><td>Recherche Z/Y, source, métadonnées et relations.</td><td>ObjectDiscovery, AdtClient, AtcRunner</td></tr><tr><td>Modèle graphe</td><td>Nœuds, arêtes, métriques, cycles et impact transitif.</td><td>DependencyGraph, GraphSerializer</td></tr><tr><td>Persistance</td><td>Cache versionné des objets et du graphe.</td><td>scan-results.json, dependency-graph.json</td></tr><tr><td>SAP backend</td><td>Where-used normalisé et exposé en JSON.</td><td>ZIF_ACORE_DEPENDENCY_PROVIDER, ZCL_ACORE_DEPENDENCY_SAP, ZCL_ACORE_DEPENDENCY_HTTP</td></tr></table>
+
+<h3>13.1 Flux général d’un scan</h3>
+<ol><li>Lecture de l’hôte, du client et du nom utilisateur depuis les paramètres VS Code.</li><li>Lecture du mot de passe depuis le stockage sécurisé.</li><li>Ping de l’endpoint ADT afin de distinguer un problème de connexion d’une erreur d’analyse.</li><li>Invalidation logique de l’ancien cache par création d’un checkpoint Discovery vide.</li><li>Recherche des objets Z* et Y* des types PROG, CLAS, FUGR et INTF.</li><li>Déduplication par type et nom.</li><li>Limitation de l’échantillon à 100 objets pendant la phase de test.</li><li>Enrichissement par petits lots pour protéger le système SAP.</li><li>Appel du provider SAP pour les callers vérifiés.</li><li>Lecture du source et calcul LOC lorsque le type le permet.</li><li>Extraction des relations candidates depuis le source.</li><li>Lecture de l’historique de modification lorsque l’objet possède un endpoint autonome.</li><li>Construction et sauvegarde d’un premier graphe.</li><li>Exécution ATC uniquement sur les objets autonomes.</li><li>Enrichissement CRV lorsqu’un successeur est disponible.</li><li>Calcul de la dette et de l’effort.</li><li>Reconstruction du graphe avec les données finales.</li><li>Écriture atomique du résultat complet et notification de l’interface.</li></ol>
+
+<h3>13.2 Modèle d’un objet enrichi</h3>
+<pre>EnrichedObject
+  name, type, uri, packageName, description
+  callerCount, callerScanStatus, callers
+  calleeCount, dependencies, impactCount, graphDepth
+  loc, lastChangedDate, changesLast12Months
+  atcFindings, classification
+  modType, modTypeConfidence, modTypeSource, modTypeEvidence
+  debtScore, effortSP, riskScore, riskLevel
+  crvEntry</pre>
+<p>La présence simultanée de la valeur et de son statut est essentielle. Sans <code>callerScanStatus</code>, la valeur numérique seule ne permet pas de savoir si zéro signifie « aucun caller » ou « analyse impossible ».</p>
+
+<h2>14. Chronologie complète des travaux</h2>
+<ol><li>Lancement du projet depuis le workspace et observation de l’inventaire.</li><li>Identification d’objets affichés avec zéro caller ou un tiret.</li><li>Analyse spécifique des sous-types PROG/I.</li><li>Vérification manuelle des reports ZCAP_1 et de ses includes.</li><li>Constat que SAP GUI ne propose pas toujours une Where-Used List directe sur un include.</li><li>Comparaison des relations du graphe avec SE24 et les résultats SAP GUI.</li><li>Identification du faux comptage des composants générés de classes.</li><li>Test de <code>RS_EU_CROSSREF</code> dans un programme ABAP dédié.</li><li>Étude des structures RINFOOBJ, RSFIND et RSFINDLST.</li><li>Création d’une structure de relation A-CorePilot et de son type table.</li><li>Création de l’interface du provider de dépendances.</li><li>Création de l’implémentation SAP.</li><li>Normalisation et déduplication des utilisateurs.</li><li>Création du handler HTTP et publication sous <code>/zacore/dependencies</code>.</li><li>Activation du service ICF et test depuis le navigateur/terminal.</li><li>Connexion de l’extension TypeScript au nouvel endpoint.</li><li>Test de ZCAP_1_TOP, puis des classes et DPC.</li><li>Correction de la distinction entre relation technique interne et caller externe.</li><li>Séparation des arêtes vérifiées et candidates.</li><li>Recalcul de Where Used, Dependencies et Impact depuis les seules preuves SAP.</li><li>Ajout du cache versionné et des checkpoints.</li><li>Blocage des scans simultanés.</li><li>Création du classifieur déterministe R5.</li><li>Ajout de la colonne R5 Type et de son explication.</li><li>Compilation et exécution des tests automatisés.</li><li>Démarrage de l’exercice ALV par une baseline ATC.</li><li>Création d’une copie séparée du report.</li><li>Correction progressive des includes et de la classe locale.</li><li>Externalisation des textes.</li><li>Modernisation de l’ALV.</li><li>Recherche des successeurs Released.</li><li>Test réel des vues CDS proposées.</li><li>Constat d’absence d’équivalence fiscale suffisante.</li><li>Création du wrapper fiscal.</li><li>Test du code TVA D1 et comparaison des résultats.</li><li>Nouvelle exécution ATC et documentation des findings résiduels.</li></ol>
+
+<h2>15. Algorithme détaillé du Where Used vérifié</h2>
+<h3>15.1 Entrées</h3>
+<ul><li>Nom normalisé de l’objet, par exemple <code>ZCAP_1_TOP</code>.</li><li>Classe Repository attendue, par exemple <code>REPS</code> ou <code>CLAS</code>.</li></ul>
+<h3>15.2 États de sortie</h3>
+<table><tr><th>Statut</th><th>Interprétation</th><th>Affichage</th></tr><tr><td>SUCCESS avec relations</td><td>Recherche réussie et callers identifiés.</td><td>Nombre positif</td></tr><tr><td>SUCCESS sans relation</td><td>Recherche réussie, aucun caller.</td><td>0</td></tr><tr><td>UNSUPPORTED</td><td>Le mécanisme ne peut pas analyser ce type.</td><td>—</td></tr><tr><td>NOT_FOUND</td><td>Objet absent ou mauvais couple nom/classe.</td><td>—</td></tr><tr><td>FAILED</td><td>Erreur technique ou réponse inutilisable.</td><td>—</td></tr></table>
+<h3>15.3 Pseudo-code</h3>
+<pre>validate object name
+choose repository class
+call RS_EU_CROSSREF
+map SY-SUBRC to explicit status
+for every RSFINDLST row:
+  normalize source and target
+  remove repository prefixes
+  reject empty or self-generated artifacts
+  create typed relation
+sort relations by semantic identity
+delete adjacent duplicates
+count unique source objects
+return status, count, relations and evidence</pre>
+
+<h3>15.4 Exemple JSON</h3>
+<pre>{
+  "objectName": "ZCAP_1_TOP",
+  "objectClass": "REPS",
+  "status": "SUCCESS",
+  "message": "1 verified user(s), 1 relation(s)",
+  "usedByCount": 1,
+  "relations": [{
+    "sourceName": "ZCAP_1",
+    "sourceClass": "P",
+    "targetName": "ZCAP_1_TOP",
+    "targetClass": "I",
+    "relationKind": "INCLUDES",
+    "sourceLine": 22,
+    "verified": true
+  }]
+}</pre>
+
+<h2>16. Construction et métriques du graphe</h2>
+<h3>16.1 Identité canonique</h3>
+<p>Un nœud est identifié par <code>TYPE::NOM</code>. Le type est ramené à sa base : PROG/P et PROG/I deviennent des nœuds de famille PROG, tout en conservant leur nature dans l’inventaire. Les noms sont trimés et convertis en majuscules.</p>
+<h3>16.2 Déduplication des arêtes</h3>
+<p>Une arête est identifiée par source, cible et nature. Lorsque plusieurs preuves décrivent la même relation, leurs sources et leurs extraits sont fusionnés. Si une preuve SAP_CROSSREF arrive après une candidate, elle devient la provenance principale et l’arête passe à l’état vérifié.</p>
+<h3>16.3 Formules des métriques</h3>
+<pre>Where Used(X)   = nombre de sources uniques des arêtes vérifiées vers X
+Dependencies(X) = nombre de cibles uniques des arêtes vérifiées depuis X
+Impact(X)       = fermeture transitive inverse depuis X
+Depth(X)        = plus longue profondeur vérifiée atteignable depuis X</pre>
+<p>Les cycles sont recherchés uniquement dans le sous-graphe vérifié. Cela empêche une simple occurrence regex de fabriquer un cycle de production.</p>
+<h3>16.4 Includes</h3>
+<p>Pour un report principal qui inclut TOP, SS et CLA, la direction correcte est :</p>
+<pre>ZCAP_1 --INCLUDES--> ZCAP_1_TOP
+ZCAP_1 --INCLUDES--> ZCAP_1_SS
+ZCAP_1 --INCLUDES--> ZCAP_1_CLA</pre>
+<p>Ainsi, chacun des includes possède un Where Used égal à un si le report parent est son seul utilisateur. Le report principal peut avoir zéro Where Used tout en possédant trois Dependencies : ces deux valeurs ne se contredisent pas.</p>
+
+<h2>17. ATC : exécution, performance et interprétation</h2>
+<p>ATC ne doit pas être exécuté séparément sur tous les sous-objets techniques lorsqu’ils sont déjà couverts par leur objet parent. Les sous-types I, S, M, F, K et J sont donc exclus de la liste des cibles autonomes.</p>
+<ul><li>Concurrence limitée à deux objets pour ATC.</li><li>Concurrence limitée à quatre objets pour l’enrichissement général.</li><li>Échec d’un objet isolé sans annuler automatiquement tous les autres.</li><li>Classification A/B/C/D seulement lorsque le résultat ATC est exploitable.</li><li>Une erreur ATC laisse la classification inconnue au lieu d’attribuer A.</li></ul>
+<table><tr><th>Priorité ATC</th><th>Points de dette</th><th>Classification utilisée</th></tr><tr><td>1</td><td>10</td><td>D lorsqu’au moins une erreur existe</td></tr><tr><td>2</td><td>5</td><td>C sans priorité 1</td></tr><tr><td>3</td><td>1</td><td>B sans priorité 1 ou 2</td></tr><tr><td>Aucun finding après succès</td><td>0</td><td>A</td></tr></table>
+
+<h2>18. Dette technique et effort</h2>
+<p>Le score composite est normalisé sur une échelle proche de 0 à 100. Il combine les findings ATC, la taille, la profondeur du graphe, le type de modification et l’âge de l’objet.</p>
+<pre>ATC normalisé    = min(1, pointsATC / 100)
+LOC normalisé    = min(1, LOC / 2000)
+Depth normalisé  = min(1, graphDepth / 10)
+Age normalisé    = min(1, ageDays / 1825)
+
+Debt = round(100 * (
+  0.30 * ATC_normalisé +
+  0.20 * LOC_normalisé +
+  0.20 * Depth_normalisé +
+  0.20 * ModType_multiplier +
+  0.10 * Age_normalisé))</pre>
+<p>L’effort de base est de 1, 3, 8 ou 21 story points pour A, B, C ou D. Un multiplicateur dépendant de la profondeur, borné à deux, augmente l’effort des objets fortement couplés.</p>
+<div class="note"><strong>Gouvernance :</strong> ces coefficients sont des règles de priorisation du projet. Ils doivent être validés par l’entreprise avant d’être utilisés pour engager un budget ou décider automatiquement d’une migration.</div>
+
+<h2>19. R5 : règles, priorité et explicabilité</h2>
+<p>Le classifieur examine les preuves dans un ordre contrôlé. Une modification classique détectée par ATC est prioritaire. Viennent ensuite les enhancements explicites ou implicites, les BAdI, les wrappers et enfin le développement personnalisé par défaut.</p>
+<pre>if ATC says modified SAP standard -> CLASSICAL_MODIFICATION / high
+else if exact implicit evidence   -> IMPLICIT_ENHANCEMENT / high
+else if ENHANCEMENT-POINT         -> EXPLICIT_ENHANCEMENT / high
+else if IF_EX_* or GET/CALL BADI  -> BADI_IMPLEMENTATION / high
+else if ZCL_IM_* naming only      -> BADI_IMPLEMENTATION / medium
+else if wrapper name + delegation -> WRAPPER_PROXY / high
+else if Z/Y namespace             -> CUSTOM_DEVELOPMENT / medium
+else                              -> CUSTOM_DEVELOPMENT / low</pre>
+<p>Les commentaires ABAP sont retirés avant l’analyse afin qu’un exemple commenté ne déclenche pas une classification. Une syntaxe ENHANCEMENT ambiguë ne permet pas d’inventer si le hook est implicite ou explicite : elle reçoit une confiance faible.</p>
+
+<div class="page-break"></div><h2>20. Exercice ALV : procédure détaillée dans SAP GUI</h2>
+<h3>20.1 Baseline</h3>
+<ol><li>Ouvrir le report original dans SE38 ou SE80.</li><li>Effectuer Ctrl+F2 pour le contrôle syntaxique.</li><li>Exécuter F8 avec un jeu de critères reproductible.</li><li>Capturer le nombre de lignes et quelques résultats métier.</li><li>Exécuter ATC et enregistrer les findings initiaux.</li><li>Ne pas corriger directement l’original.</li></ol>
+<h3>20.2 Création de la copie</h3>
+<ol><li>Copier vers <code>ZPROG_ALV_YME_CC</code>.</li><li>Cocher Source, Text Elements et Includes.</li><li>Créer les includes avec une nomenclature homogène.</li><li>Vérifier que le report principal référence uniquement les nouveaux includes.</li><li>Attribuer un package de test ou une demande de transport selon les règles du système.</li></ol>
+<h3>20.3 Ordre d’activation</h3>
+<ol><li>TOP : types et déclaration différée.</li><li>SS : écran de sélection.</li><li>CLA : classe locale.</li><li>Text Pool du programme principal.</li><li>Report principal.</li><li>Ctrl+F2 global puis Ctrl+F3.</li><li>F8 et comparaison avec la baseline.</li></ol>
+
+<h2>21. Organisation recommandée du code ALV</h2>
+<h3>21.1 TOP</h3>
+<pre>CLASS lcl_report DEFINITION DEFERRED.
+
+TYPES: BEGIN OF lty_result,
+  company_code        TYPE bukrs,
+  document_number     TYPE belnr_d,
+  fiscal_year         TYPE gjahr,
+  posting_date        TYPE budat,
+  document_date       TYPE bldat,
+  tax_code            TYPE mwskz,
+  tax_account         TYPE saknr,
+  tax_rate            TYPE kbetr,
+END OF lty_result.
+
+TYPES lty_result_tab TYPE STANDARD TABLE OF lty_result
+  WITH EMPTY KEY.
+
+DATA go_report TYPE REF TO lcl_report.</pre>
+<h3>21.2 Sélection</h3>
+<pre>SELECTION-SCREEN BEGIN OF BLOCK b1
+  WITH FRAME TITLE text-001.
+SELECT-OPTIONS:
+  s_ste   FOR gv_company_code,
+  s_npc   FOR gv_document_number,
+  s_excpt FOR gv_fiscal_year DEFAULT '2025'.
+PARAMETERS p_ldg TYPE rldnr.
+SELECTION-SCREEN END OF BLOCK b1.</pre>
+<p>La convention retenue utilise <code>S_</code> pour SELECT-OPTIONS et <code>P_</code> pour PARAMETERS. Les variables utilisées par FOR doivent être déclarées avant l’include SS.</p>
+<h3>21.3 Classe locale</h3>
+<pre>CLASS lcl_report DEFINITION FINAL.
+  PUBLIC SECTION.
+    METHODS constructor
+      IMPORTING io_tax_provider TYPE REF TO zif_yme_tax_provider.
+    METHODS run.
+  PRIVATE SECTION.
+    DATA mt_result TYPE lty_result_tab.
+    DATA mo_tax_provider TYPE REF TO zif_yme_tax_provider.
+    METHODS get_data.
+    METHODS enrich_data.
+    METHODS show_alv.
+ENDCLASS.</pre>
+<p>L’injection par interface évite que la classe métier construise elle-même sa dépendance legacy. Le programme principal choisit l’implémentation, tandis que le report consomme uniquement le contrat.</p>
+
+<h2>22. Wrapper fiscal : code d’intégration complet</h2>
+<h3>22.1 Injection</h3>
+<pre>INITIALIZATION.
+  go_report = NEW lcl_report(
+    io_tax_provider = NEW zcl_yme_tax_legacy( ) ).
+
+START-OF-SELECTION.
+  go_report->run( ).</pre>
+<h3>22.2 Orchestration</h3>
+<pre>METHOD run.
+  get_data( ).
+  IF mt_result IS INITIAL.
+    MESSAGE text-003 TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+  enrich_data( ).
+  show_alv( ).
+ENDMETHOD.</pre>
+<h3>22.3 Enrichissement</h3>
+<pre>METHOD enrich_data.
+  LOOP AT mt_result ASSIGNING FIELD-SYMBOL(&lt;result&gt;).
+    IF &lt;result&gt;-tax_code IS INITIAL.
+      CONTINUE.
+    ENDIF.
+    mo_tax_provider->get_tax_data(
+      EXPORTING
+        iv_tax_code       = &lt;result&gt;-tax_code
+      IMPORTING
+        ev_tax_account    = &lt;result&gt;-tax_account
+        ev_tax_rate       = &lt;result&gt;-tax_rate
+        ev_account_found  = DATA(lv_account_found)
+        ev_rate_found     = DATA(lv_rate_found) ).
+  ENDLOOP.
+ENDMETHOD.</pre>
+<h3>22.4 Remplacement futur</h3>
+<p>Lorsque SAP fournit une API Released fonctionnellement équivalente, une classe <code>ZCL_YME_TAX_RELEASED</code> peut implémenter la même interface. Le report ne change pas ; seule l’instanciation est remplacée.</p>
+
+<h2>23. Analyse des SELECT SINGLE</h2>
+<p>Le finding « SELECT SINGLE is possibly not unique » signifie que le prédicat ne couvre pas une clé unique. Il ne faut pas le masquer sans règle métier.</p>
+<table><tr><th>Situation</th><th>Correction</th></tr><tr><td>La clé complète est connue</td><td>Ajouter tous les champs de clé au WHERE.</td></tr><tr><td>Plusieurs lignes sont métierment possibles</td><td>Lire la liste et traiter explicitement la cardinalité.</td></tr><tr><td>Une seule ligne doit être choisie</td><td>SELECT UP TO 1 ROWS avec ORDER BY déterministe.</td></tr><tr><td>Lecture répétée dans LOOP</td><td>Précharger par lots ou joindre via une source Released adaptée.</td></tr></table>
+<p>Dans le wrapper fiscal, la sélection doit également considérer les dates de validité si elles appartiennent réellement à la source utilisée. L’erreur rencontrée sur <code>DATAB</code> a montré qu’il ne faut jamais supposer qu’un champ existe dans A003 sans vérifier le dictionnaire du système.</p>
+
+<h2>24. Matrice de tests</h2>
+<table><tr><th>ID</th><th>Scénario</th><th>Résultat attendu</th></tr><tr><td>DG-01</td><td>Include avec un report parent</td><td>Where Used = 1, relation INCLUDES vérifiée</td></tr><tr><td>DG-02</td><td>Objet sans caller après SUCCESS</td><td>Where Used = 0</td></tr><tr><td>DG-03</td><td>Provider indisponible</td><td>Tiret ou statut failed, jamais zéro confirmé</td></tr><tr><td>DG-04</td><td>Relation regex sans SAP_CROSSREF</td><td>Candidate, aucun impact métrique</td></tr><tr><td>DG-05</td><td>Composant généré de classe</td><td>Pas de faux caller de la classe racine</td></tr><tr><td>DG-06</td><td>Deux preuves pour la même arête</td><td>Une seule arête avec preuves fusionnées</td></tr><tr><td>R5-01</td><td>Finding modification standard</td><td>CLASSICAL_MODIFICATION / high</td></tr><tr><td>R5-02</td><td>INTERFACES IF_EX_*</td><td>BADI_IMPLEMENTATION / high</td></tr><tr><td>R5-03</td><td>Nom wrapper avec délégation</td><td>WRAPPER_PROXY / high</td></tr><tr><td>R5-04</td><td>Objet Z standard sans signal</td><td>CUSTOM_DEVELOPMENT / medium</td></tr><tr><td>ALV-01</td><td>Ctrl+F2 sur la copie</td><td>Aucune erreur syntaxique</td></tr><tr><td>ALV-02</td><td>F8 avec baseline</td><td>Même résultat fonctionnel</td></tr><tr><td>TAX-01</td><td>Code TVA D1</td><td>Compte 4366100000, taux 18, flags X</td></tr><tr><td>ATC-01</td><td>Text Pool activé</td><td>Disparition des findings texte concernés</td></tr></table>
+
+<h2>25. Diagnostic des incidents</h2>
+<table><tr><th>Symptôme</th><th>Cause probable</th><th>Action</th></tr><tr><td>Le graphe est vide</td><td>Cache ancien/incompatible ou scan partiel</td><td>Recharger l’extension et relancer un scan complet</td></tr><tr><td>Le scan semble disparaître en changeant d’onglet</td><td>État UI non restauré</td><td>Vérifier la barre globale et les messages scanProgress</td></tr><tr><td>Zéro inhabituel</td><td>Succès réellement vide ou mauvaise classe Repository</td><td>Contrôler status, message, objectClass et relations JSON</td></tr><tr><td>Beaucoup de dépendances fausses</td><td>Candidate edges activé</td><td>Désactiver l’option et examiner SAP Verified</td></tr><tr><td>ATC très long</td><td>Trop de cibles ou variante lourde</td><td>Exclure les sous-objets, réduire l’échantillon, utiliser la variante validée</td></tr><tr><td>Ancienne interface après compilation</td><td>Extension Host non rechargé</td><td>Developer: Reload Window ou relancer F5</td></tr><tr><td>No values found sur un CDS</td><td>Successeur non équivalent ou filtres incorrects</td><td>Comparer modèle, données et sémantique ; ne pas forcer le remplacement</td></tr></table>
+
+<h2>26. Checklist de mise en production</h2>
+<h3>26.1 Sécurité</h3>
+<ul><li>Protéger l’endpoint <code>/zacore/dependencies</code> par authentification et autorisations adaptées.</li><li>Ne jamais journaliser les mots de passe ou secrets SAP.</li><li>Utiliser HTTPS avec un certificat reconnu.</li><li>Limiter l’accès Repository selon les rôles de l’utilisateur technique.</li><li>Tracer les erreurs sans exposer le source ABAP sensible.</li></ul>
+<h3>26.2 Performance</h3>
+<ul><li>Valider les limites de concurrence avec l’équipe Basis.</li><li>Mesurer le temps moyen et le taux d’échec sur un package pilote.</li><li>Prévoir reprise, timeout, backoff et cache selon la charge.</li><li>Éviter ATC complet synchrone pour des milliers d’objets.</li><li>Prévoir scan incrémental par date ou transport.</li></ul>
+<h3>26.3 Qualité des données</h3>
+<ul><li>Afficher date, système, client et version du scan.</li><li>Ne mélanger ni environnements ni clients SAP dans le même cache.</li><li>Conserver la provenance de chaque arête.</li><li>Auditer un échantillon contre SAP GUI.</li><li>Définir un seuil de couverture avant usage décisionnel.</li></ul>
+<h3>26.4 Transport et gouvernance</h3>
+<ul><li>Déplacer les objets depuis $TMP vers un package transportable.</li><li>Créer une demande dédiée et documentée.</li><li>Séparer objets backend SAP, extension VS Code et configuration.</li><li>Faire valider le wrapper legacy par l’architecture Clean Core.</li><li>Créer une date de révision pour chaque exception non Released.</li></ul>
+
+<h2>27. Livrables réalisés</h2>
+<ul><li>extension A-CorePilot compilable ;</li><li>inventaire des objets et statuts where-used ;</li><li>provider SAP de dépendances et service HTTP ;</li><li>graphe vérifié avec candidats séparés ;</li><li>cache résilient et scans protégés ;</li><li>classifieur R5 déterministe ;</li><li>tests TypeScript du graphe et de R5 ;</li><li>copie ZPROG_ALV_YME_CC et ses includes ;</li><li>Text Pool français ;</li><li>modernisation SALV ;</li><li>analyse Cloudification Repository ;</li><li>interface et classe wrapper fiscal ;</li><li>preuve fonctionnelle D1 ;</li><li>comparaison avant/après et limites documentées.</li></ul>
+
+<h2>28. Glossaire</h2>
+<table><tr><th>Terme</th><th>Définition</th></tr><tr><td>ADT</td><td>ABAP Development Tools et services HTTP utilisés par les outils de développement.</td></tr><tr><td>ATC</td><td>ABAP Test Cockpit, moteur de contrôles syntaxiques, qualité et cloudification.</td></tr><tr><td>Caller / Used By</td><td>Objet qui utilise l’objet analysé ; relation entrante.</td></tr><tr><td>Dependency</td><td>Objet utilisé par l’objet analysé ; relation sortante.</td></tr><tr><td>Clean Core</td><td>Approche visant à réduire les modifications du standard et à consommer des contrats stables.</td></tr><tr><td>Released API</td><td>Objet explicitement publié par SAP pour un scénario et un contrat d’usage.</td></tr><tr><td>Wrapper</td><td>Classe qui cache un composant legacy derrière une interface stable.</td></tr><tr><td>Candidate</td><td>Relation plausible mais non confirmée par le provider Repository.</td></tr><tr><td>SAP Verified</td><td>Relation confirmée par la source SAP_CROSSREF du projet.</td></tr><tr><td>Impact transitif</td><td>Ensemble des utilisateurs directs et indirects potentiellement affectés.</td></tr><tr><td>CRV</td><td>Cloudification Repository Viewer, utilisé pour rechercher statut et successeur.</td></tr><tr><td>R5</td><td>Dimension de risque liée au type de modification ou d’extension.</td></tr></table>
+
+<h2>29. Conclusion</h2>
+<p>A-CorePilot est passé d’un prototype aux compteurs difficiles à interpréter vers une chaîne où la provenance des relations est visible et où seules les preuves SAP vérifiées influencent les métriques. L’exercice ALV a appliqué une migration progressive : préserver l’original, stabiliser une copie, corriger les problèmes, rechercher et tester les APIs Released, puis isoler la dette non remplaçable.</p>
+<p>Le résultat n’est pas présenté comme une conformité Clean Core absolue. Il constitue une base auditable, testable et évolutive dont les limites sont documentées.</p>
+<p class="small">Rapport généré à partir des travaux réalisés dans le workspace A-CorePilot et des validations effectuées dans SAP Logon.</p>
+</body></html>

@@ -1,5 +1,10 @@
 import { AdtClient } from './AdtClient';
 import { CrvEntry } from '../crv/CrvDatastore';
+import {
+  classifyModificationType,
+  ModificationTypeConfidence,
+  ModificationTypeSource,
+} from '../debt/ModificationTypeClassifier';
 
 // ── Domain types (shared across all phases) ──────────────────────────────────
 
@@ -29,16 +34,19 @@ export interface RiskDimensions {
   r6_dataSensitivity: number;
 }
 
-export type DependencyKind = 'CALLS' | 'INCLUDES' | 'USES_TABLE' | 'ENHANCES';
-export type DependencySource = 'ADT_WHERE_USED' | 'SOURCE_PATTERN' | 'LLM' | 'ATC_FINDING';
+export type DependencyKind = 'CALLS' | 'INCLUDES' | 'IMPLEMENTS' | 'BADI_IMPLEMENTATION' | 'USES_TABLE' | 'ENHANCES';
+export type DependencySource = 'SAP_CROSSREF' | 'ADT_WHERE_USED' | 'SOURCE_PATTERN' | 'METADATA' | 'LLM' | 'ATC_FINDING';
 export type DependencyConfidence = 'high' | 'medium' | 'low';
 
 export interface DependencyReference {
   name: string;
   type: string;
+  kind?: DependencyKind;
   uri?: string;
   packageName?: string;
   description?: string;
+  /** Exact provenance of an incoming relation. Only SAP_CROSSREF is authoritative. */
+  source?: DependencySource;
 }
 
 export interface ObjectDependency extends DependencyReference {
@@ -62,7 +70,10 @@ export interface EnrichedObject {
   description: string;
   // From where-used
   callerCount: number;
+  /** Whether ADT produced a usable where-used result for this object. */
+  callerScanStatus?: 'success' | 'failed' | 'unsupported';
   calleeCount: number;
+  impactCount?: number;
   callers: DependencyReference[];
   dependencies: ObjectDependency[];
   graphDepth: number;
@@ -76,6 +87,9 @@ export interface EnrichedObject {
   atcFindings: AtcFinding[];
   atcFindingsCount: number;
   modType: ModificationType | undefined;
+  modTypeConfidence?: ModificationTypeConfidence;
+  modTypeSource?: ModificationTypeSource;
+  modTypeEvidence?: string;
   // Set by CrvDatastore (P4)
   crvEntry: CrvEntry | undefined;
   // Set by DebtAnalystAgent (P5)
@@ -105,12 +119,20 @@ function xmlAttr(xml: string, attr: string): string {
 }
 
 function decodeXml(value: string): string {
-  return value
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
+  let decoded = value;
+  // Some SAP search responses escape attribute values more than once
+  // (for example &amp;lt;). Decode a bounded number of layers safely.
+  for (let i = 0; i < 3; i++) {
+    const next = decoded
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded;
 }
 
 function cleanObjectName(name: string): string {
@@ -219,16 +241,16 @@ function parseSearchResults(xml: string): Array<{ name: string; type: string; ur
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {
     const attrs = m[1];
-    const name = xmlAttr(attrs, 'adtcore:name');
-    const type = xmlAttr(attrs, 'adtcore:type');
+    const name = cleanObjectName(xmlAttr(attrs, 'adtcore:name'));
+    const type = decodeXml(xmlAttr(attrs, 'adtcore:type')).trim().toUpperCase();
     if (!name || !type) continue;
     if (!name.startsWith('Z') && !name.startsWith('Y')) continue;
     objects.push({
       name,
       type,
       uri: xmlAttr(attrs, 'adtcore:uri'),   // exact URI SAP registered — use for where-used
-      packageName: xmlAttr(attrs, 'adtcore:packageName'),
-      description: xmlAttr(attrs, 'adtcore:description'),
+      packageName: decodeXml(xmlAttr(attrs, 'adtcore:packageName')),
+      description: decodeXml(xmlAttr(attrs, 'adtcore:description')),
     });
   }
   return objects;
@@ -289,6 +311,16 @@ function dedupeReferences(refs: DependencyReference[]): DependencyReference[] {
   return deduped;
 }
 
+function repositoryClassToObjectType(repositoryClass: string): string {
+  const normalized = (repositoryClass || '').trim().toUpperCase();
+  if (normalized === 'P' || normalized === 'I' || normalized === 'REPS') return 'PROG';
+  if (normalized === 'K' || normalized === 'CLAS' || normalized === 'OC' || normalized === 'OM') return 'CLAS';
+  if (normalized === 'F' || normalized === 'FUNC') return 'FUNC';
+  if (normalized === 'G' || normalized === 'FUGR') return 'FUGR';
+  if (normalized === 'N' || normalized === 'INTF') return 'INTF';
+  return 'UNKNOWN';
+}
+
 /**
  * Extract direct caller objects from ADT where-used XML.
  * The XML shape differs across SAP releases, so this parser looks for any
@@ -321,7 +353,7 @@ function pushDependency(
   const name = cleanObjectName(targetName);
   const type = cleanObjectType(targetType);
   if (!name || name === cleanObjectName(selfName)) return;
-  if (!name.startsWith('Z') && !name.startsWith('Y')) return;
+  if (!name.startsWith('Z') && !name.startsWith('Y') && !(kind === 'IMPLEMENTS' && name.startsWith('IF_'))) return;
 
   deps.push({
     name,
@@ -361,6 +393,7 @@ export function extractSourceDependencies(source: string, selfName: string): Obj
   runDependencyPattern(deps, source, selfName, /\bSUBMIT\s+([ZY][A-Z0-9_/$-]+)/gi, 'PROG', 'CALLS', 'high');
   runDependencyPattern(deps, source, selfName, /\bPERFORM\b[\s\S]{0,120}?\bIN\s+PROGRAM\s+([ZY][A-Z0-9_/$-]+)/gi, 'PROG', 'CALLS', 'medium');
   runDependencyPattern(deps, source, selfName, /^\s*INCLUDE\s+([ZY][A-Z0-9_/$-]+)/gim, 'PROG', 'INCLUDES', 'high');
+  runDependencyPattern(deps, source, selfName, /\bINTERFACES\s+((?:[ZY]IF|IF_EX_)[A-Z0-9_/$-]+)/gi, 'INTF', 'IMPLEMENTS', 'high');
   runDependencyPattern(deps, source, selfName, /\b(?:FROM|JOIN|UPDATE|MODIFY|DELETE\s+FROM|INSERT\s+(?:INTO\s+)?)\s+([ZY][A-Z0-9_/$-]+)/gi, 'TABL', 'USES_TABLE', 'medium');
   runDependencyPattern(deps, source, selfName, /\b(?:GET\s+BADI|CALL\s+BADI)\s+([ZY][A-Z0-9_/$-]+)/gi, 'BADI', 'ENHANCES', 'medium');
 
@@ -406,7 +439,9 @@ export function extractAtcDependencies(findings: AtcFinding[], selfName: string)
 
     for (const rawName of names) {
       const name = cleanObjectName(rawName);
-      if (!name || name === self || !isLikelyAtcReferenceName(name)) continue;
+      // ATC locations often append a component path to the current object
+      // (ZCL_FOO/METHOD). It is evidence about self, not a dependency.
+      if (!name || name === self || name.split('/')[0] === self || !isLikelyAtcReferenceName(name)) continue;
 
       const type = inferAtcReferenceType(name, finding.message);
       const kind = inferAtcDependencyKind(type, finding);
@@ -538,17 +573,28 @@ export class ObjectDiscovery {
     const total = slicedRaws.length;
     const enriched: EnrichedObject[] = [];
 
-    // 2. Enrich each object (non-critical calls are fire-and-forget)
-    for (let i = 0; i < slicedRaws.length; i++) {
-      const raw = slicedRaws[i];
+    // 2. Enrich objects in small batches. Four concurrent objects keeps the
+    // scan responsive without putting production SAP systems under a burst of
+    // one request per discovered object.
+    const enrichmentConcurrency = 4;
+    for (let batchStart = 0; batchStart < slicedRaws.length; batchStart += enrichmentConcurrency) {
+      const batch = slicedRaws.slice(batchStart, batchStart + enrichmentConcurrency);
+      const batchResults = await Promise.all(batch.map(async (raw, batchIndex): Promise<EnrichedObject> => {
+      const i = batchStart + batchIndex;
       onProgress(i + 1, total, raw.name);
 
       let callerCount = 0;
+      let callerScanStatus: EnrichedObject['callerScanStatus'] = 'unsupported';
       let changesLast12Months = 0;
       let lastChangedDate = '';   // empty = unknown, not "today"
       let loc = 0;
       let callers: DependencyReference[] = [];
       let dependencies: ObjectDependency[] = [];
+      let modificationClassification = classifyModificationType({
+        name: raw.name,
+        type: raw.type,
+        description: raw.description,
+      });
 
       // Only attempt where-used for types the SAP ADT endpoint supports
       const baseType = raw.type.split('/')[0];
@@ -557,12 +603,69 @@ export class ObjectDiscovery {
       if (i < 10) {
         _log(`[DIAG object] i=${i} name=${raw.name} type=${raw.type} baseType=${baseType} subType="${subType}" passesFilter=${WHERE_USED_TYPES.has(baseType) && !EXCLUDED_SUBTYPES.has(subType)}`);
       }
-      if (WHERE_USED_TYPES.has(baseType) && !EXCLUDED_SUBTYPES.has(subType)) {
+      let verifiedApiHandled = false;
+
+      // The customer-owned SAP wrapper is the authoritative source for
+      // reports and includes. It can resolve technical child objects that the
+      // generic ADT usageReferences endpoint rejects.
+      const verifiedRepositoryClass = baseType === 'PROG'
+        ? 'REPS'
+        : baseType === 'CLAS'
+          ? 'CLAS'
+          : undefined;
+      if (verifiedRepositoryClass) {
+        try {
+          const verified = await this.client.getVerifiedUsedBy(raw.name, verifiedRepositoryClass);
+          if (verified.status === 'SUCCESS') {
+            callers = dedupeReferences(
+              verified.relations
+                .filter(relation => relation.verified && relation.sourceName)
+                .map(relation => ({
+                  name: relation.sourceName,
+                  type: repositoryClassToObjectType(relation.sourceClass),
+                  kind: relation.relationKind === 'INCLUDES' ? 'INCLUDES' as const : 'CALLS' as const,
+                  description: relation.evidence || undefined,
+                  source: 'SAP_CROSSREF' as const,
+                }))
+            );
+            callerCount = callers.length;
+            callerScanStatus = 'success';
+            verifiedApiHandled = true;
+            _log(`[ObjectDiscovery] verified SAP API: ${raw.name} -> ${callerCount} unique caller(s).`);
+          } else if (verified.status === 'UNSUPPORTED') {
+            callerScanStatus = 'unsupported';
+            verifiedApiHandled = true;
+          } else if (verified.status === 'NOT_FOUND') {
+            callerScanStatus = 'failed';
+            verifiedApiHandled = true;
+          }
+        } catch (e: any) {
+          _log(`[ObjectDiscovery] verified SAP API unavailable for ${raw.name}; falling back to ADT: ${e.message?.slice(0, 300)}`);
+        }
+      }
+
+      if (!verifiedApiHandled && WHERE_USED_TYPES.has(baseType) && !EXCLUDED_SUBTYPES.has(subType)) {
+        callerScanStatus = 'failed';
         try {
           const whereUsedXml = await this.client.getWhereUsed(raw.name, baseType, raw.uri);
           if (whereUsedXml) {
             callers = parseWhereUsedReferences(whereUsedXml, raw.name, baseType);
-            callerCount = callers.length > 0 ? callers.length : parseCallerCount(whereUsedXml);
+            callers = callers.map(caller => ({ ...caller, source: 'ADT_WHERE_USED' }));
+            const anonymousCount = parseCallerCount(whereUsedXml);
+            if (callers.length > 0) {
+              callerCount = callers.length;
+              callerScanStatus = 'success';
+            } else if (anonymousCount > 0) {
+              // SAP sometimes reports a numeric result without identifying any
+              // caller (and SAP GUI may say where-used is unavailable). Such a
+              // number cannot support impact analysis, so keep it unknown.
+              callerCount = 0;
+              callerScanStatus = 'failed';
+              _log(`[ObjectDiscovery] where-used returned ${anonymousCount} anonymous result(s) for ${raw.name}; no caller identity was accepted.`);
+            } else {
+              callerCount = 0;
+              callerScanStatus = 'success';
+            }
             if (i < 10) {
               _log(`[DIAG where-used] ${raw.name} (${raw.type}) → callerCount=${callerCount} | XML preview: ${whereUsedXml.slice(0, 400)}`);
             }
@@ -589,6 +692,12 @@ export class ObjectDiscovery {
           const src = await this.client.getSourceCode(raw.type, raw.name);
           loc = countLoc(src);
           dependencies = extractSourceDependencies(src, raw.name);
+          modificationClassification = classifyModificationType({
+            name: raw.name,
+            type: raw.type,
+            description: raw.description,
+            sourceCode: src,
+          });
           if (this.llmDependencyExtractor && shouldUseLlmDependencyExtraction(src, dependencies)) {
             try {
               const llmDependencies = await this.llmDependencyExtractor(src, raw);
@@ -603,9 +712,10 @@ export class ObjectDiscovery {
         } catch { /* non-critical */ }
       }
 
-      enriched.push({
+      return {
         ...raw,
         callerCount,
+        callerScanStatus,
         calleeCount: 0,   // filled after graph construction
         callers,
         dependencies,
@@ -617,7 +727,10 @@ export class ObjectDiscovery {
         classification: undefined,
         atcFindings: [],
         atcFindingsCount: 0,
-        modType: undefined,
+        modType: modificationClassification.type,
+        modTypeConfidence: modificationClassification.confidence,
+        modTypeSource: modificationClassification.source,
+        modTypeEvidence: modificationClassification.evidence,
         crvEntry: undefined,       // filled by CrvDatastore (P4)
         debtScore: undefined,
         effortSP: undefined,
@@ -625,7 +738,9 @@ export class ObjectDiscovery {
         riskLevel: undefined,
         riskDimensions: undefined,
         riskAdvisory: undefined,
-      });
+      };
+      }));
+      enriched.push(...batchResults);
     }
 
     return enriched;

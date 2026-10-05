@@ -12,7 +12,9 @@ export function buildDependencyGraph(objects: EnrichedObject[]): SerializedDepen
 export function persistDependencyGraph(filePath: string, graph: SerializedDependencyGraph): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(graph, null, 2), 'utf-8');
+  const temporaryPath = `${filePath}.tmp`;
+  fs.writeFileSync(temporaryPath, JSON.stringify(graph, null, 2), 'utf-8');
+  fs.renameSync(temporaryPath, filePath);
 }
 
 export function loadDependencyGraph(filePath: string): SerializedDependencyGraph | null {
@@ -20,7 +22,7 @@ export function loadDependencyGraph(filePath: string): SerializedDependencyGraph
   try {
     const raw = fs.readFileSync(filePath, 'utf-8');
     const parsed = JSON.parse(raw) as SerializedDependencyGraph;
-    if (parsed.version !== 1 || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
+    if (parsed.version !== 3 || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
       return null;
     }
     return parsed;

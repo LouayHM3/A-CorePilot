@@ -45,7 +45,7 @@ export class SapObjectTreeItem extends vscode.TreeItem {
       `**${obj.name}** (${obj.type})\n\n` +
       `📦 Package: \`${obj.packageName || '—'}\`\n\n` +
       `📝 ${obj.description || 'No description'}\n\n` +
-      `📏 LOC: ${obj.loc ?? '?'} | 👥 Callers: ${obj.callerCount} | ` +
+      `📏 LOC: ${obj.loc ?? '?'} | 👥 Used by: ${obj.callerScanStatus === 'success' || obj.callerCount > 0 ? obj.callerCount : '?'} | ` +
       `🔄 Changes (12m): ${obj.changesLast12Months}`
     );
     this.iconPath = new vscode.ThemeIcon(TYPE_ICON[obj.type] ?? 'symbol-misc');

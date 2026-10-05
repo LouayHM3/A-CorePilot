@@ -115,7 +115,7 @@ export class DashboardPanel {
               (objects) => {
                 this.sidebar.refresh(objects);
                 const dependencyGraph = ScannerAgent.loadDependencyGraphFromDisk();
-                this._post({ type: 'scanComplete', objects, dependencyGraph });
+                this._post({ type: 'scanComplete', objects, dependencyGraph, scanStatus: 'complete', scanPhase: 'complete' });
               },
               (errorMessage) => {
                 this._post({ type: 'scanError', message: errorMessage });
@@ -129,7 +129,15 @@ export class DashboardPanel {
             const dependencyGraph = ScannerAgent.loadDependencyGraphFromDisk();
             if (saved) {
               this.sidebar.refresh(saved.objects);
-              this._post({ type: 'scanComplete', objects: saved.objects, dependencyGraph, fromCache: true, scannedAt: saved.scannedAt });
+              this._post({
+                type: 'scanComplete',
+                objects: saved.objects,
+                dependencyGraph,
+                fromCache: true,
+                scannedAt: saved.scannedAt,
+                scanStatus: saved.status,
+                scanPhase: saved.phase,
+              });
             } else {
               this._post({ type: 'noScanResults' });
             }
@@ -138,8 +146,14 @@ export class DashboardPanel {
 
           case 'loadDependencyGraph': {
             const dependencyGraph = ScannerAgent.loadDependencyGraphFromDisk();
+            const saved = ScannerAgent.loadFromDisk();
             if (dependencyGraph) {
-              this._post({ type: 'dependencyGraphLoaded', dependencyGraph });
+              this._post({
+                type: 'dependencyGraphLoaded',
+                dependencyGraph,
+                scanStatus: saved?.status,
+                scanPhase: saved?.phase,
+              });
             } else {
               this._post({ type: 'noDependencyGraph' });
             }

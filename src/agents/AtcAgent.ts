@@ -12,10 +12,15 @@ export class AtcAgent {
     log: (msg: string) => void
   ): Promise<void> {
     const runner = new AtcRunner(adtClient);
-    const total = objects.length;
+    // Technical program parts are checked as part of their standalone parent.
+    const excludedSubtypes = new Set(['I', 'S', 'M', 'F', 'K', 'J']);
+    const targets = objects.filter(obj => !excludedSubtypes.has(obj.type.split('/')[1] ?? ''));
+    const total = targets.length;
+    const concurrency = 2;
 
-    for (let i = 0; i < total; i++) {
-      const obj = objects[i];
+    log(`ATC targets: ${total}/${objects.length} standalone objects (${objects.length - total} technical child objects covered by parents).`);
+
+    const scanObject = async (obj: EnrichedObject, i: number): Promise<void> => {
       onProgress(i + 1, total, obj.name);
 
       try {
@@ -45,6 +50,11 @@ export class AtcAgent {
         obj.atcFindings = [];
         obj.classification = undefined; // ATC failure => unclassified (-)
       }
+    };
+
+    for (let start = 0; start < total; start += concurrency) {
+      const batch = targets.slice(start, start + concurrency);
+      await Promise.all(batch.map((obj, offset) => scanObject(obj, start + offset)));
     }
   }
 }

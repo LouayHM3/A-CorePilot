@@ -4,8 +4,8 @@ import { vscode } from '../vscodeApi';
 
 type ClassLevel = 'A' | 'B' | 'C' | 'D';
 type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
-type EdgeKind = 'CALLS' | 'INCLUDES' | 'USES_TABLE' | 'ENHANCES';
-type EdgeSource = 'ADT_WHERE_USED' | 'SOURCE_PATTERN' | 'LLM' | 'ATC_FINDING';
+type EdgeKind = 'CALLS' | 'INCLUDES' | 'IMPLEMENTS' | 'BADI_IMPLEMENTATION' | 'USES_TABLE' | 'ENHANCES';
+type EdgeSource = 'SAP_CROSSREF' | 'ADT_WHERE_USED' | 'SOURCE_PATTERN' | 'METADATA' | 'LLM' | 'ATC_FINDING';
 type ClassFilter = 'all' | ClassLevel | 'external';
 
 interface GraphNode {
@@ -22,6 +22,7 @@ interface GraphNode {
   loc: number;
   callerCount: number;
   calleeCount: number;
+  impactCount?: number;
   graphDepth: number;
   external: boolean;
 }
@@ -38,6 +39,8 @@ interface GraphEdge {
   rawText?: string;
   evidence?: string[];
   validatedByAtc?: boolean;
+  verified?: boolean;
+  verificationNote?: string;
   cycle: boolean;
 }
 
@@ -48,8 +51,9 @@ interface GraphCycle {
 }
 
 interface DependencyGraphData {
-  version: 1;
+  version: 3;
   generatedAt: string;
+  historicalDemo?: boolean;
   nodes: GraphNode[];
   edges: GraphEdge[];
   cycles: GraphCycle[];
@@ -66,7 +70,126 @@ interface DependencyGraphData {
 
 interface Props {
   onStartScan: () => void;
+  isActive: boolean;
 }
+
+const demoNode = (
+  id: string, name: string, type: string, packageName: string, description: string,
+  classification: ClassLevel, loc: number, callerCount: number, calleeCount: number,
+  impactCount: number, graphDepth: number, riskLevel: RiskLevel,
+): GraphNode => ({
+  id, name, type, packageName, description, classification,
+  debtScore: riskLevel === 'Critical' ? 78 : riskLevel === 'High' ? 58 : riskLevel === 'Medium' ? 34 : 16,
+  effortSP: riskLevel === 'Critical' ? 13 : riskLevel === 'High' ? 8 : riskLevel === 'Medium' ? 5 : 2,
+  riskScore: riskLevel === 'Critical' ? 82 : riskLevel === 'High' ? 64 : riskLevel === 'Medium' ? 39 : 18,
+  riskLevel, loc, callerCount, calleeCount, impactCount, graphDepth, external: false,
+});
+
+const demoEdge = (
+  source: string, target: string, kind: EdgeKind, sourceType: EdgeSource = 'SOURCE_PATTERN',
+  confidence: 'high' | 'medium' | 'low' = 'high', cycle = false,
+): GraphEdge => ({
+  id: `${source}->${target}`, source, target, kind, sourceType, confidence,
+  label: kind === 'USES_TABLE' ? 'USES TABLE' : kind, evidence: ['Historical demonstration reference'],
+  verified: true, cycle,
+});
+
+const DEMO_GRAPH_CATALOG: GraphNode[] = Array.from({ length: 82 }, (_, index) => {
+  const number = String(index + 1).padStart(3, '0');
+  const domains = [
+    ['CORE', 'ZCORE_DEMO', 'Core order management'],
+    ['SALES', 'ZSD_DEMO', 'Sales and distribution'],
+    ['FIN', 'ZFI_DEMO', 'Finance and controlling'],
+    ['INT', 'ZINT_DEMO', 'Integration services'],
+    ['LOG', 'ZLOG_DEMO', 'Logistics operations'],
+  ] as const;
+  const [prefix, packageName, domainDescription] = domains[index % domains.length];
+  const type = ['CLAS', 'PROG', 'TABL', 'INTF', 'FUGR'][index % 5];
+  const namePrefix = type === 'CLAS' ? 'ZCL' : type === 'PROG' ? 'ZREPORT' : type === 'TABL' ? 'ZTABLE' : type === 'INTF' ? 'ZIF' : 'ZFG';
+  const name = `${namePrefix}_${prefix}_${number}`;
+  const loc = type === 'TABL' ? 0 : 140 + ((index * 67) % 980);
+  const callerCount = 1 + ((index * 3) % 8);
+  const calleeCount = type === 'TABL' || type === 'INTF' ? 0 : 1 + ((index * 5) % 6);
+  const impactCount = callerCount + calleeCount;
+  const classification: ClassLevel = impactCount >= 11 ? 'D' : impactCount >= 8 ? 'C' : impactCount >= 4 ? 'B' : 'A';
+  const riskLevel: RiskLevel = impactCount >= 11 ? 'Critical' : impactCount >= 8 ? 'High' : impactCount >= 4 ? 'Medium' : 'Low';
+  return demoNode(`${type}::${name}`, name, type, packageName, `${domainDescription} demonstration object ${number}`, classification, loc, callerCount, calleeCount, impactCount, 1 + (index % 5), riskLevel);
+});
+
+const DEMO_GRAPH_CATALOG_EDGES: GraphEdge[] = Array.from({ length: 82 }, (_, index) => {
+  const node = DEMO_GRAPH_CATALOG[index];
+  const previous = DEMO_GRAPH_CATALOG[(index + 82 - 1) % 82];
+  const anchor = ['CLAS::ZCL_ORDER_SERVICE', 'CLAS::ZCL_PRICING_ENGINE', 'CLAS::ZCL_INVOICE_SERVICE', 'CLAS::ZAPI_ORDER_OUTBOUND', 'CLAS::ZCL_DELIVERY_TRACKER'][index % 5];
+  const kind: EdgeKind = node.type === 'TABL' ? 'USES_TABLE' : index % 9 === 0 ? 'ENHANCES' : index % 7 === 0 ? 'IMPLEMENTS' : 'CALLS';
+  return demoEdge(node.id, index % 3 === 0 ? anchor : previous.id, kind, index % 4 === 0 ? 'ADT_WHERE_USED' : 'SOURCE_PATTERN', index % 6 === 0 ? 'medium' : 'high');
+});
+
+const DEMO_CROSS_DOMAIN_EDGES: GraphEdge[] = Array.from({ length: 36 }, (_, index) => {
+  const source = DEMO_GRAPH_CATALOG[index * 2];
+  const target = DEMO_GRAPH_CATALOG[(index * 2 + 17) % 82];
+  const kind: EdgeKind = index % 4 === 0 ? 'USES_TABLE' : index % 5 === 0 ? 'INCLUDES' : 'CALLS';
+  return demoEdge(source.id, target.id, kind, 'SOURCE_PATTERN', index % 8 === 0 ? 'medium' : 'high', index === 8 || index === 24);
+});
+
+const DEMO_GRAPH: DependencyGraphData = {
+  version: 3,
+  generatedAt: '2025-07-15T00:00:00.000Z',
+  historicalDemo: true,
+  nodes: [
+    demoNode('CLAS::ZCL_ORDER_SERVICE', 'ZCL_ORDER_SERVICE', 'CLAS', 'ZCORE_DEMO', 'Order processing service', 'B', 428, 5, 4, 9, 1, 'Medium'),
+    demoNode('PROG::ZREPORT_ORDER_UI', 'ZREPORT_ORDER_UI', 'PROG', 'ZCORE_DEMO', 'Order overview report', 'C', 286, 0, 5, 6, 0, 'High'),
+    demoNode('CLAS::ZCL_INVOICE_SERVICE', 'ZCL_INVOICE_SERVICE', 'CLAS', 'ZFI_DEMO', 'Invoice integration service', 'C', 512, 4, 3, 7, 2, 'High'),
+    demoNode('CLAS::ZCL_ORDER_BATCH', 'ZCL_ORDER_BATCH', 'CLAS', 'ZCORE_DEMO', 'Background order processing', 'B', 364, 2, 4, 6, 1, 'Medium'),
+    demoNode('TABL::ZORDER_STATUS', 'ZORDER_STATUS', 'TABL', 'ZCORE_DEMO', 'Order status persistence', 'A', 0, 4, 0, 5, 3, 'Low'),
+    demoNode('CLAS::ZCL_CUSTOMER_SERVICE', 'ZCL_CUSTOMER_SERVICE', 'CLAS', 'ZSD_DEMO', 'Customer master facade', 'C', 617, 3, 4, 8, 1, 'High'),
+    demoNode('CLAS::ZCL_PRICING_ENGINE', 'ZCL_PRICING_ENGINE', 'CLAS', 'ZSD_DEMO', 'Sales pricing calculation', 'D', 742, 6, 3, 10, 2, 'Critical'),
+    demoNode('PROG::ZREPORT_SALES_ANALYSIS', 'ZREPORT_SALES_ANALYSIS', 'PROG', 'ZSD_DEMO', 'Sales analytics report', 'C', 934, 0, 6, 8, 0, 'High'),
+    demoNode('TABL::ZSALES_ORDER', 'ZSALES_ORDER', 'TABL', 'ZSD_DEMO', 'Sales order persistence', 'B', 0, 5, 0, 7, 3, 'Medium'),
+    demoNode('INTF::ZIF_PRICING_PROVIDER', 'ZIF_PRICING_PROVIDER', 'INTF', 'ZSD_DEMO', 'Pricing provider contract', 'A', 118, 2, 0, 4, 3, 'Low'),
+    demoNode('CLAS::ZCL_PAYMENT_ADAPTER', 'ZCL_PAYMENT_ADAPTER', 'CLAS', 'ZFI_DEMO', 'Payment gateway adapter', 'C', 388, 3, 3, 6, 2, 'High'),
+    demoNode('PROG::ZFI_POSTING_JOB', 'ZFI_POSTING_JOB', 'PROG', 'ZFI_DEMO', 'Finance posting background job', 'B', 476, 1, 4, 5, 1, 'Medium'),
+    demoNode('TABL::ZFI_DOCUMENT', 'ZFI_DOCUMENT', 'TABL', 'ZFI_DEMO', 'Finance document persistence', 'B', 0, 4, 0, 6, 3, 'Medium'),
+    demoNode('CLAS::ZCL_DELIVERY_TRACKER', 'ZCL_DELIVERY_TRACKER', 'CLAS', 'ZINT_DEMO', 'Delivery status tracking', 'C', 559, 3, 3, 6, 2, 'High'),
+    demoNode('CLAS::ZAPI_ORDER_OUTBOUND', 'ZAPI_ORDER_OUTBOUND', 'CLAS', 'ZINT_DEMO', 'Outbound order API', 'D', 831, 2, 5, 8, 1, 'Critical'),
+    demoNode('CLAS::ZCL_LEGACY_WRAPPER', 'ZCL_LEGACY_WRAPPER', 'CLAS', 'ZINT_DEMO', 'Legacy integration wrapper', 'D', 1068, 2, 3, 7, 2, 'Critical'),
+    demoNode('CLAS::ZBADI_ORDER_ENRICH', 'ZBADI_ORDER_ENRICH', 'CLAS', 'ZCORE_DEMO', 'Order enhancement implementation', 'B', 244, 1, 2, 3, 2, 'Medium'),
+    demoNode('TABL::ZINVOICE_ARCHIVE', 'ZINVOICE_ARCHIVE', 'TABL', 'ZFI_DEMO', 'Archived invoice records', 'A', 0, 2, 0, 3, 3, 'Low'),
+    ...DEMO_GRAPH_CATALOG,
+  ],
+  edges: [
+    demoEdge('PROG::ZREPORT_ORDER_UI', 'CLAS::ZCL_ORDER_SERVICE', 'CALLS', 'ADT_WHERE_USED'),
+    demoEdge('CLAS::ZCL_ORDER_BATCH', 'CLAS::ZCL_ORDER_SERVICE', 'CALLS'),
+    demoEdge('CLAS::ZCL_ORDER_SERVICE', 'CLAS::ZCL_INVOICE_SERVICE', 'CALLS', 'SOURCE_PATTERN', 'medium'),
+    demoEdge('PROG::ZREPORT_ORDER_UI', 'TABL::ZORDER_STATUS', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_ORDER_BATCH', 'TABL::ZORDER_STATUS', 'USES_TABLE'),
+    demoEdge('PROG::ZREPORT_ORDER_UI', 'CLAS::ZCL_CUSTOMER_SERVICE', 'CALLS'),
+    demoEdge('CLAS::ZCL_CUSTOMER_SERVICE', 'CLAS::ZCL_PRICING_ENGINE', 'CALLS'),
+    demoEdge('CLAS::ZCL_PRICING_ENGINE', 'INTF::ZIF_PRICING_PROVIDER', 'IMPLEMENTS'),
+    demoEdge('PROG::ZREPORT_SALES_ANALYSIS', 'CLAS::ZCL_PRICING_ENGINE', 'CALLS', 'ADT_WHERE_USED'),
+    demoEdge('PROG::ZREPORT_SALES_ANALYSIS', 'TABL::ZSALES_ORDER', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_PRICING_ENGINE', 'TABL::ZSALES_ORDER', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_INVOICE_SERVICE', 'CLAS::ZCL_PAYMENT_ADAPTER', 'CALLS'),
+    demoEdge('PROG::ZFI_POSTING_JOB', 'CLAS::ZCL_INVOICE_SERVICE', 'CALLS'),
+    demoEdge('PROG::ZFI_POSTING_JOB', 'TABL::ZFI_DOCUMENT', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_PAYMENT_ADAPTER', 'TABL::ZFI_DOCUMENT', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_INVOICE_SERVICE', 'TABL::ZINVOICE_ARCHIVE', 'USES_TABLE'),
+    demoEdge('CLAS::ZAPI_ORDER_OUTBOUND', 'CLAS::ZCL_ORDER_SERVICE', 'CALLS'),
+    demoEdge('CLAS::ZAPI_ORDER_OUTBOUND', 'CLAS::ZCL_DELIVERY_TRACKER', 'CALLS'),
+    demoEdge('CLAS::ZCL_DELIVERY_TRACKER', 'CLAS::ZCL_LEGACY_WRAPPER', 'CALLS', 'SOURCE_PATTERN', 'medium'),
+    demoEdge('CLAS::ZCL_LEGACY_WRAPPER', 'CLAS::ZAPI_ORDER_OUTBOUND', 'CALLS', 'SOURCE_PATTERN', 'low', true),
+    demoEdge('CLAS::ZBADI_ORDER_ENRICH', 'CLAS::ZCL_ORDER_SERVICE', 'ENHANCES'),
+    demoEdge('CLAS::ZBADI_ORDER_ENRICH', 'TABL::ZORDER_STATUS', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_CUSTOMER_SERVICE', 'TABL::ZSALES_ORDER', 'USES_TABLE'),
+    demoEdge('CLAS::ZCL_ORDER_SERVICE', 'CLAS::ZCL_DELIVERY_TRACKER', 'CALLS', 'SOURCE_PATTERN', 'medium'),
+    demoEdge('CLAS::ZCL_DELIVERY_TRACKER', 'TABL::ZORDER_STATUS', 'USES_TABLE'),
+    ...DEMO_GRAPH_CATALOG_EDGES,
+    ...DEMO_CROSS_DOMAIN_EDGES,
+  ],
+  cycles: [{ id: 'cycle-1', nodeIds: ['CLAS::ZAPI_ORDER_OUTBOUND', 'CLAS::ZCL_DELIVERY_TRACKER', 'CLAS::ZCL_LEGACY_WRAPPER'], edgeIds: ['CLAS::ZAPI_ORDER_OUTBOUND->CLAS::ZCL_DELIVERY_TRACKER', 'CLAS::ZCL_DELIVERY_TRACKER->CLAS::ZCL_LEGACY_WRAPPER', 'CLAS::ZCL_LEGACY_WRAPPER->CLAS::ZAPI_ORDER_OUTBOUND'] }],
+  topologicalOrder: ['PROG::ZREPORT_ORDER_UI', 'PROG::ZREPORT_SALES_ANALYSIS', 'PROG::ZFI_POSTING_JOB', 'CLAS::ZCL_CUSTOMER_SERVICE', 'CLAS::ZCL_ORDER_BATCH', 'CLAS::ZCL_ORDER_SERVICE', 'CLAS::ZCL_PRICING_ENGINE', 'CLAS::ZCL_INVOICE_SERVICE', 'CLAS::ZCL_PAYMENT_ADAPTER', 'CLAS::ZCL_DELIVERY_TRACKER', 'TABL::ZORDER_STATUS', 'TABL::ZSALES_ORDER', 'TABL::ZFI_DOCUMENT', ...DEMO_GRAPH_CATALOG.map(node => node.id)],
+  criticalPath: ['PROG::ZREPORT_SALES_ANALYSIS', 'CLAS::ZCL_PRICING_ENGINE', 'INTF::ZIF_PRICING_PROVIDER'],
+  stats: { nodeCount: 100, edgeCount: 143, internalNodeCount: 100, externalNodeCount: 0, cycleCount: 1 },
+};
 
 const CLASS_COLORS: Record<ClassLevel, string> = {
   A: '#8c8c8c',
@@ -78,6 +201,8 @@ const CLASS_COLORS: Record<ClassLevel, string> = {
 const KIND_COLORS: Record<EdgeKind, string> = {
   CALLS: '#4da3ff',
   INCLUDES: '#a6a6a6',
+  IMPLEMENTS: '#7bdcb5',
+  BADI_IMPLEMENTATION: '#ff9f43',
   USES_TABLE: '#16b6a5',
   ENHANCES: '#d783ff',
 };
@@ -85,11 +210,13 @@ const KIND_COLORS: Record<EdgeKind, string> = {
 const INITIAL_KIND_FILTER: Record<EdgeKind, boolean> = {
   CALLS: true,
   INCLUDES: true,
+  IMPLEMENTS: true,
+  BADI_IMPLEMENTATION: true,
   USES_TABLE: true,
   ENHANCES: true,
 };
 
-export default function DependencyGraphView({ onStartScan }: Props) {
+export default function DependencyGraphView({ onStartScan, isActive }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const selectedNodeRef = useRef<string | null>(null);
@@ -99,8 +226,10 @@ export default function DependencyGraphView({ onStartScan }: Props) {
   const [packageFilter, setPackageFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [kindFilter, setKindFilter] = useState<Record<EdgeKind, boolean>>(INITIAL_KIND_FILTER);
+  const [showCandidates, setShowCandidates] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [missingGraph, setMissingGraph] = useState(false);
+  const [partialPhase, setPartialPhase] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -108,13 +237,16 @@ export default function DependencyGraphView({ onStartScan }: Props) {
       if (msg.type === 'scanComplete' && msg.dependencyGraph) {
         setGraph(msg.dependencyGraph);
         setMissingGraph(false);
+        setPartialPhase(msg.scanStatus === 'partial' ? (msg.scanPhase ?? 'unknown') : null);
       }
       if (msg.type === 'dependencyGraphLoaded' && msg.dependencyGraph) {
         setGraph(msg.dependencyGraph);
         setMissingGraph(false);
+        setPartialPhase(msg.scanStatus === 'partial' ? (msg.scanPhase ?? 'unknown') : null);
       }
       if (msg.type === 'noDependencyGraph' || msg.type === 'noScanResults') {
-        setMissingGraph(true);
+        setGraph(DEMO_GRAPH);
+        setMissingGraph(false);
       }
     };
 
@@ -139,7 +271,14 @@ export default function DependencyGraphView({ onStartScan }: Props) {
   const visibleNodes = useMemo(() => {
     if (!graph) return [];
 
+    const verifiedNodeIds = new Set(
+      graph.edges
+        .filter(edge => edge.verified)
+        .flatMap(edge => [edge.source, edge.target])
+    );
+
     return graph.nodes.filter(node => {
+      const evidenceOk = showCandidates || !node.external || verifiedNodeIds.has(node.id);
       const classOk =
         classFilter === 'all' ||
         (classFilter === 'external' ? node.external : node.classification === classFilter);
@@ -150,20 +289,21 @@ export default function DependencyGraphView({ onStartScan }: Props) {
         node.type.toLowerCase().includes(query) ||
         node.packageName.toLowerCase().includes(query) ||
         node.description.toLowerCase().includes(query);
-      return classOk && packageOk && searchOk;
+      return evidenceOk && classOk && packageOk && searchOk;
     });
-  }, [graph, classFilter, packageFilter, searchQuery]);
+  }, [graph, classFilter, packageFilter, searchQuery, showCandidates]);
 
   const visibleNodeIds = useMemo(() => new Set(visibleNodes.map(node => node.id)), [visibleNodes]);
 
   const visibleEdges = useMemo(() => {
     if (!graph) return [];
     return graph.edges.filter(edge =>
+      (showCandidates || edge.verified) &&
       kindFilter[edge.kind] &&
       visibleNodeIds.has(edge.source) &&
       visibleNodeIds.has(edge.target)
     );
-  }, [graph, kindFilter, visibleNodeIds]);
+  }, [graph, kindFilter, visibleNodeIds, showCandidates]);
 
   const selectedNode = useMemo(
     () => graph?.nodes.find(node => node.id === selectedNodeId) ?? null,
@@ -171,13 +311,13 @@ export default function DependencyGraphView({ onStartScan }: Props) {
   );
 
   const incomingEdges = useMemo(
-    () => graph?.edges.filter(edge => edge.target === selectedNodeId) ?? [],
-    [graph, selectedNodeId]
+    () => graph?.edges.filter(edge => edge.target === selectedNodeId && (showCandidates || edge.verified)) ?? [],
+    [graph, selectedNodeId, showCandidates]
   );
 
   const outgoingEdges = useMemo(
-    () => graph?.edges.filter(edge => edge.source === selectedNodeId) ?? [],
-    [graph, selectedNodeId]
+    () => graph?.edges.filter(edge => edge.source === selectedNodeId && (showCandidates || edge.verified)) ?? [],
+    [graph, selectedNodeId, showCandidates]
   );
 
   useEffect(() => {
@@ -198,7 +338,7 @@ export default function DependencyGraphView({ onStartScan }: Props) {
   }, [selectedNodeId, visibleNodeIds]);
 
   useEffect(() => {
-    if (!containerRef.current || !graph) return;
+    if (!containerRef.current || !graph || !isActive) return;
 
     cyRef.current?.destroy();
     const elements = buildElements(visibleNodes, visibleEdges);
@@ -244,7 +384,18 @@ export default function DependencyGraphView({ onStartScan }: Props) {
         cyRef.current = null;
       }
     };
-  }, [graph, visibleNodes, visibleEdges]);
+  }, [graph, visibleNodes, visibleEdges, isActive]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    // The graph can receive scan results while its tab is hidden. Wait for the
+    // browser to lay out the visible container before recalculating Cytoscape.
+    const frame = window.requestAnimationFrame(() => {
+      cyRef.current?.resize();
+      cyRef.current?.fit(undefined, 36);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isActive, graph]);
 
   const fitGraph = () => {
     cyRef.current?.fit(undefined, 36);
@@ -323,6 +474,14 @@ export default function DependencyGraphView({ onStartScan }: Props) {
         </div>
 
         <div className="graph-toolbar-right">
+          <label className="graph-toggle" title="Show heuristic and unresolved relationships that do not affect production metrics">
+            <input
+              type="checkbox"
+              checked={showCandidates}
+              onChange={() => setShowCandidates(value => !value)}
+            />
+            <span>Candidate edges</span>
+          </label>
           {Object.keys(INITIAL_KIND_FILTER).map(kind => (
             <label className="graph-toggle" key={kind}>
               <input
@@ -339,7 +498,11 @@ export default function DependencyGraphView({ onStartScan }: Props) {
       </div>
 
       <div className="graph-summary-strip">
+        {graph.historicalDemo && <span>Historical demo</span>}
+        {partialPhase && <span title="The previous scan stopped before completion">Partial scan: {partialPhase}</span>}
         <span>Internal {graph.stats.internalNodeCount}</span>
+        <span>SAP verified {graph.edges.filter(edge => edge.verified).length}</span>
+        <span>Candidates {graph.edges.filter(edge => !edge.verified).length}</span>
         <span>External {graph.stats.externalNodeCount}</span>
         <span>Cycles {graph.stats.cycleCount}</span>
         <span>Generated {relativeDate(graph.generatedAt)}</span>
@@ -474,8 +637,9 @@ function NodeDetail({
         <Metric label="Debt" value={displayNumber(node.debtScore)} />
         <Metric label="Risk" value={node.riskScore === undefined ? '-' : `${node.riskScore} ${node.riskLevel ?? ''}`.trim()} />
         <Metric label="LOC" value={displayNumber(node.loc)} />
-        <Metric label="Callers" value={displayNumber(node.callerCount)} />
-        <Metric label="Deps" value={displayNumber(node.calleeCount)} />
+        <Metric label="Where Used" value={displayNumber(node.callerCount)} />
+        <Metric label="Dependencies" value={displayNumber(node.calleeCount)} />
+        <Metric label="Total Impact" value={displayNumber(node.impactCount ?? impactPath(graph, node.id).nodeIds.length)} />
         <Metric label="Depth" value={displayNumber(node.graphDepth)} />
         <Metric label="Effort" value={node.effortSP === undefined ? '-' : `${node.effortSP} SP`} />
       </div>
@@ -529,6 +693,12 @@ function EdgeList({
             <div className="graph-edge-row" key={edge.id}>
               <span className="graph-edge-kind">{kindLabel(edge.kind)}</span>
               <span className="graph-edge-peer">{peer?.name ?? edge[direction]}</span>
+              <span
+                className={edge.verified ? 'graph-edge-proof' : 'graph-edge-candidate'}
+                title={edge.verificationNote}
+              >
+                {edge.verified ? 'VERIFIED' : 'CANDIDATE'}
+              </span>
               {edge.validatedByAtc && <span className="graph-edge-proof">ATC</span>}
             </div>
           );
@@ -562,7 +732,7 @@ function buildElements(nodes: GraphNode[], edges: GraphEdge[]): cytoscape.Elemen
         color: KIND_COLORS[edge.kind],
         width: edgeWidth(edge.kind),
       },
-      classes: edge.cycle ? 'cycle-edge' : '',
+      classes: [edge.cycle ? 'cycle-edge' : '', edge.verified ? '' : 'candidate-edge'].filter(Boolean).join(' '),
     })),
   ];
 }
@@ -624,6 +794,13 @@ function buildCytoscapeStyle(): cytoscape.StylesheetJson {
       },
     },
     {
+      selector: 'edge.candidate-edge',
+      style: {
+        'line-style': 'dashed',
+        'opacity': 0.35,
+      },
+    },
+    {
       selector: '.dimmed',
       style: {
         'opacity': 0.14,
@@ -682,6 +859,7 @@ function clearImpactHighlight(cy: cytoscape.Core, selectedNodeId: string | null)
 function impactPath(graph: DependencyGraphData, nodeId: string): { nodeIds: string[]; edgeIds: string[] } {
   const incoming = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {
+    if (!edge.verified) continue;
     const list = incoming.get(edge.target) ?? [];
     list.push(edge);
     incoming.set(edge.target, list);

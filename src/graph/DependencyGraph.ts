@@ -20,6 +20,7 @@ export interface DependencyGraphNode {
   loc: number;
   callerCount: number;
   calleeCount: number;
+  impactCount: number;
   graphDepth: number;
   external: boolean;
 }
@@ -36,6 +37,8 @@ export interface DependencyGraphEdge {
   rawText?: string;
   evidence: string[];
   validatedByAtc: boolean;
+  verified: boolean;
+  verificationNote: string;
   cycle: boolean;
 }
 
@@ -54,7 +57,7 @@ export interface DependencyGraphStats {
 }
 
 export interface SerializedDependencyGraph {
-  version: 1;
+  version: 3;
   generatedAt: string;
   nodes: DependencyGraphNode[];
   edges: DependencyGraphEdge[];
@@ -70,6 +73,8 @@ interface EdgeDraft {
   kind: DependencyKind;
   sourceType: DependencySource;
   confidence: DependencyConfidence;
+  verified: boolean;
+  verificationNote: string;
   rawText?: string;
 }
 
@@ -87,20 +92,45 @@ export class DependencyGraph {
     for (const obj of objects) {
       const objectId = objectIdFor(obj.type, obj.name);
 
+      const badiMatch = obj.description?.match(/BAdI\s+imp\.\s*([A-Z0-9_/$-]+)/i);
+      if (badiMatch) {
+        const badiNode = nodeFromReference({ name: badiMatch[1], type: 'BADI' });
+        graph.addNode(badiNode);
+        graph.addEdge({
+          source: badiNode.id,
+          target: objectId,
+          kind: 'BADI_IMPLEMENTATION',
+          sourceType: 'METADATA',
+          confidence: 'high',
+          verified: false,
+          verificationNote: 'Candidate inferred from description; SAP BAdI metadata lookup required.',
+          rawText: obj.description,
+        });
+      }
+
       for (const caller of obj.callers ?? []) {
         const callerNode = nodeFromReference(caller);
+        const isSapVerified = caller.source === 'SAP_CROSSREF';
         graph.addNode(callerNode);
         graph.addEdge({
           source: callerNode.id,
           target: objectId,
-          kind: 'CALLS',
-          sourceType: 'ADT_WHERE_USED',
-          confidence: 'high',
+          kind: caller.kind ?? 'CALLS',
+          sourceType: caller.source ?? 'ADT_WHERE_USED',
+          confidence: isSapVerified ? 'high' : 'medium',
+          verified: isSapVerified,
+          verificationNote: isSapVerified
+            ? 'Caller identity verified by the SAP RS_EU_CROSSREF provider.'
+            : 'ADT usage reference candidate; not confirmed by the SAP cross-reference provider.',
         });
       }
 
       for (const dependency of obj.dependencies ?? []) {
         const dependencyNode = nodeFromReference(dependency);
+        const targetExistsInInventory = graph.nodesById.has(dependencyNode.id);
+        // Source parsing and ATC messages are useful evidence, but neither is
+        // an authoritative SAP repository relation. Keep them as candidates.
+        const verified = false;
         graph.addNode(dependencyNode);
         graph.addEdge({
           source: objectId,
@@ -108,6 +138,10 @@ export class DependencyGraph {
           kind: dependency.kind,
           sourceType: dependency.source,
           confidence: dependency.confidence,
+          verified,
+          verificationNote: verified
+            ? 'Verified by SAP repository cross-reference.'
+            : `${dependency.source} candidate; ${targetExistsInInventory ? 'target exists in inventory but' : 'target or'} semantic relation is not SAP-verified.`,
           rawText: dependency.rawText,
         });
       }
@@ -127,14 +161,16 @@ export class DependencyGraph {
 
   applyMetricsToObjects(objects: EnrichedObject[]): void {
     const depths = this.computeDepths();
-    const incomingCalls = this.countIncomingCalls();
+    const incomingCalls = this.countIncomingUsages();
     const outgoingDependencies = this.countOutgoingDependencies();
 
     for (const obj of objects) {
       const id = objectIdFor(obj.type, obj.name);
       obj.calleeCount = outgoingDependencies.get(id) ?? 0;
       obj.graphDepth = depths.get(id) ?? 0;
-      obj.callerCount = Math.max(obj.callerCount || 0, incomingCalls.get(id) ?? 0);
+      // A caller count must always be backed by identifiable incoming edges.
+      obj.callerCount = incomingCalls.get(id) ?? 0;
+      obj.impactCount = this.impactOf(id).length;
     }
   }
 
@@ -281,7 +317,7 @@ export class DependencyGraph {
     const edges = this.edges.map(edge => ({ ...edge, cycle: cycleEdgeIds.has(edge.id) }));
 
     return {
-      version: 1,
+      version: 3,
       generatedAt,
       nodes,
       edges,
@@ -320,6 +356,11 @@ export class DependencyGraph {
         existing.sourceTypes.push(edge.sourceType);
       }
       existing.confidence = strongerConfidence(existing.confidence, edge.confidence);
+      existing.verified = existing.verified || edge.verified;
+      if (edge.verified) {
+        existing.sourceType = edge.sourceType;
+        existing.verificationNote = edge.verificationNote;
+      }
       existing.validatedByAtc = existing.validatedByAtc || edge.sourceType === 'ATC_FINDING';
       if (edge.rawText && !existing.evidence.includes(edge.rawText)) {
         existing.evidence.push(edge.rawText);
@@ -337,37 +378,50 @@ export class DependencyGraph {
       label: edge.kind.replace('_', ' '),
       evidence: edge.rawText ? [edge.rawText] : [],
       validatedByAtc: edge.sourceType === 'ATC_FINDING',
+      verified: edge.verified,
+      verificationNote: edge.verificationNote,
       cycle: false,
     });
   }
 
   private refreshMetrics(): void {
     const depths = this.computeDepths();
-    const incomingCalls = this.countIncomingCalls();
+    const incomingCalls = this.countIncomingUsages();
     const outgoingDependencies = this.countOutgoingDependencies();
 
     for (const node of this.nodesById.values()) {
-      node.callerCount = Math.max(node.callerCount, incomingCalls.get(node.id) ?? 0);
+      node.callerCount = incomingCalls.get(node.id) ?? 0;
       node.calleeCount = outgoingDependencies.get(node.id) ?? node.calleeCount;
       node.graphDepth = depths.get(node.id) ?? node.graphDepth;
+      node.impactCount = this.impactOf(node.id).length;
     }
   }
 
-  private countIncomingCalls(): Map<string, number> {
-    const counts = new Map<string, number>();
+  /**
+   * Count objects that can be affected by a change to the target.
+   * A main program that includes an include is just as relevant to impact
+   * analysis as a conventional caller, even though the edge kind is INCLUDES.
+   */
+  private countIncomingUsages(): Map<string, number> {
+    const users = new Map<string, Set<string>>();
     for (const edge of this.edgesById.values()) {
-      if (edge.kind !== 'CALLS') continue;
-      counts.set(edge.target, (counts.get(edge.target) ?? 0) + 1);
+      if (!edge.verified) continue;
+      const sources = users.get(edge.target) ?? new Set<string>();
+      sources.add(edge.source);
+      users.set(edge.target, sources);
     }
-    return counts;
+    return new Map(Array.from(users, ([id, sources]) => [id, sources.size]));
   }
 
   private countOutgoingDependencies(): Map<string, number> {
-    const counts = new Map<string, number>();
+    const dependencies = new Map<string, Set<string>>();
     for (const edge of this.edgesById.values()) {
-      counts.set(edge.source, (counts.get(edge.source) ?? 0) + 1);
+      if (!edge.verified) continue;
+      const targets = dependencies.get(edge.source) ?? new Set<string>();
+      targets.add(edge.target);
+      dependencies.set(edge.source, targets);
     }
-    return counts;
+    return new Map(Array.from(dependencies, ([id, targets]) => [id, targets.size]));
   }
 
   private computeDepths(): Map<string, number> {
@@ -402,6 +456,7 @@ export class DependencyGraph {
       adjacency.set(nodeId, new Set());
     }
     for (const edge of this.edgesById.values()) {
+      if (!edge.verified) continue;
       adjacency.get(edge.source)?.add(edge.target);
     }
     return mapSetsToSortedArrays(adjacency);
@@ -413,6 +468,7 @@ export class DependencyGraph {
       adjacency.set(nodeId, new Set());
     }
     for (const edge of this.edgesById.values()) {
+      if (!edge.verified) continue;
       adjacency.get(edge.target)?.add(edge.source);
     }
     return mapSetsToSortedArrays(adjacency);
@@ -464,6 +520,7 @@ function nodeFromObject(obj: EnrichedObject): DependencyGraphNode {
     loc: obj.loc || 0,
     callerCount: obj.callerCount || 0,
     calleeCount: obj.calleeCount || 0,
+    impactCount: obj.impactCount || 0,
     graphDepth: obj.graphDepth || 0,
     external: false,
   };
@@ -479,6 +536,7 @@ function nodeFromReference(ref: DependencyReference): DependencyGraphNode {
     loc: 0,
     callerCount: 0,
     calleeCount: 0,
+    impactCount: 0,
     graphDepth: 0,
     external: true,
   };

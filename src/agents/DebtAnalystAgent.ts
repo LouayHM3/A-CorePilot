@@ -1,7 +1,11 @@
-import { EnrichedObject } from '../sap/ObjectDiscovery';
+import type { EnrichedObject } from '../sap/ObjectDiscovery';
 import { computeAtcDebtScore, computeCompositeDebtScore, computeEffortSP } from '../debt/DebtFormula';
-import { AiCoreClient } from '../services/AiCoreClient';
-import { SecretStorageService } from '../services/SecretStorageService';
+import type { SecretStorageService } from '../services/SecretStorageService';
+import {
+  classifyModificationType,
+  strongerModificationClassification,
+} from '../debt/ModificationTypeClassifier';
+import type { ModificationTypeClassification } from '../debt/ModificationTypeClassifier';
 
 export class DebtAnalystAgent {
   static async run(
@@ -12,7 +16,8 @@ export class DebtAnalystAgent {
   ): Promise<void> {
     const _log = log ?? ((msg: string) => console.log(msg));
     const total = objects.length;
-    const aiClient = secrets ? new AiCoreClient(secrets) : null;
+    // Kept in the signature for API compatibility; R5 no longer uses an LLM.
+    void secrets;
 
     _log(`[DebtAnalystAgent] Calculating technical debt & effort for ${total} objects...`);
 
@@ -22,17 +27,24 @@ export class DebtAnalystAgent {
         onProgress(i + 1, total, `Debt Analysis [${i + 1}/${total}] ${obj.name}`);
       }
 
-      // Step 1: Determine modification type (using LLM or fallback)
-      if (!obj.modType && aiClient) {
-        try {
-          obj.modType = await aiClient.classifyModificationType(obj.name, '');
-        } catch {
-          obj.modType = 'CUSTOM_DEVELOPMENT';
-        }
-      }
-      if (!obj.modType) {
-        obj.modType = 'CUSTOM_DEVELOPMENT';
-      }
+      // Step 1: Refine the source/metadata classification with ATC evidence.
+      const existing: ModificationTypeClassification = {
+        type: obj.modType ?? 'CUSTOM_DEVELOPMENT',
+        confidence: obj.modTypeConfidence ?? 'low',
+        source: obj.modTypeSource ?? 'DEFAULT',
+        evidence: obj.modTypeEvidence ?? 'No prior deterministic evidence',
+      };
+      const fromAtc = classifyModificationType({
+        name: obj.name,
+        type: obj.type,
+        description: obj.description,
+        atcFindings: obj.atcFindings,
+      });
+      const selected = strongerModificationClassification(existing, fromAtc);
+      obj.modType = selected.type;
+      obj.modTypeConfidence = selected.confidence;
+      obj.modTypeSource = selected.source;
+      obj.modTypeEvidence = selected.evidence;
 
       const graphDepth = obj.graphDepth ?? Math.min(10, Math.floor((obj.callerCount || 0) / 2));
 

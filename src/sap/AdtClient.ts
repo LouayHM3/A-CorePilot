@@ -16,6 +16,26 @@ export interface AdtObject {
   description: string;
 }
 
+export interface VerifiedDependencyRelation {
+  sourceName: string;
+  sourceClass: string;
+  targetName: string;
+  targetClass: string;
+  relationKind: string;
+  sourceLine: number;
+  evidence: string;
+  verified: boolean;
+}
+
+export interface VerifiedUsedByResponse {
+  objectName: string;
+  objectClass: string;
+  status: 'SUCCESS' | 'FAILED' | 'UNSUPPORTED' | 'NOT_FOUND';
+  message: string;
+  usedByCount: number;
+  relations: VerifiedDependencyRelation[];
+}
+
 interface HttpResult {
   statusCode: number;
   body: string;
@@ -242,6 +262,50 @@ export class AdtClient {
     }
 
     throw new Error(`Where-used failed (${getResult.statusCode}): ${getResult.body.slice(0, 500)}`);
+  }
+
+  /**
+   * Query the customer-owned SAP repository wrapper. Unlike ADT's generic
+   * usageReferences response, this endpoint returns normalized caller
+   * identities and an explicit scan status. A numeric zero is trustworthy
+   * only when status is SUCCESS.
+   */
+  async getVerifiedUsedBy(
+    objectName: string,
+    objectClass = 'REPS'
+  ): Promise<VerifiedUsedByResponse> {
+    const path =
+      `/zacore/dependencies?objectName=${encodeURIComponent(objectName)}` +
+      `&objectClass=${encodeURIComponent(objectClass)}`;
+    const result = await this.request('GET', path, undefined, {
+      'Accept': 'application/json',
+    });
+
+    if (result.statusCode !== 200 && result.statusCode !== 404 && result.statusCode !== 422) {
+      throw new Error(`A-Core dependency API failed (${result.statusCode}): ${result.body.slice(0, 500)}`);
+    }
+
+    let parsed: VerifiedUsedByResponse;
+    try {
+      parsed = JSON.parse(result.body) as VerifiedUsedByResponse;
+    } catch {
+      throw new Error(`A-Core dependency API returned invalid JSON: ${result.body.slice(0, 300)}`);
+    }
+
+    if (!parsed || typeof parsed.status !== 'string') {
+      throw new Error('A-Core dependency API returned an unusable response.');
+    }
+
+    // /UI2/CL_JSON with compression may omit an initial internal table.
+    // SUCCESS without a relations property is a verified empty result.
+    if (parsed.relations === undefined && parsed.status === 'SUCCESS') {
+      parsed.relations = [];
+    }
+    if (!Array.isArray(parsed.relations)) {
+      throw new Error('A-Core dependency API returned an unusable relations payload.');
+    }
+
+    return parsed;
   }
 
   // ── Transport History ───────────────────────────────────────────────────

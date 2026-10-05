@@ -149,7 +149,8 @@ R₄ = min(1.0, changesLast12Months / 12)   // monthly change = max risk
 *What kind of custom object is this? Some types are inherently more fragile to migrate.*
 
 ```
-// Determined by LLM analysis of source code + ATC findings
+// Determined by deterministic SAP metadata, ATC and ABAP source rules.
+// Every result stores confidence, source and evidence; no LLM call is used for R5.
 modType → riskMultiplier:
 
   CLASSICAL_MODIFICATION    → 1.0   // direct modification of SAP standard (most dangerous)
@@ -472,7 +473,9 @@ Tie-breaker: if an object qualifies for both C and D → D wins.
 - `src/agents/DebtAnalystAgent.ts`
 
 **DebtAnalystAgent flow:**
-1. For each object: determine `modType` via LLM call (source code analysis)
+1. For each object: determine `modType` deterministically from SAP metadata,
+   ATC findings, ABAP source patterns and naming conventions. Store
+   `{ modType, modTypeConfidence, modTypeSource, modTypeEvidence }`.
 2. Call `DebtFormula.computeDebtScore(metrics)` → `debtScore`
 3. Call `DebtFormula.computeEffortSP(level, graphDepth)` → `effortSP`
 4. Call `RiskScorer.compute(object, graph, adtMetrics)` → `RiskResult`

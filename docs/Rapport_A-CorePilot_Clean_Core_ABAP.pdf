@@ -1,0 +1,1047 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R 20 0 R 22 0 R 24 0 R 26 0 R 28 0 R 30 0 R 32 0 R 34 0 R 36 0 R 38 0 R] /Count 17 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 4149 >>
+stream
+BT
+/F2 18 Tf 1 0 0 1 50 800 Tm (Rapport de projet) Tj
+/F1 9.5 Tf 1 0 0 1 50 775 Tm (A-CorePilot & Clean Core ABAP) Tj
+/F1 9.5 Tf 1 0 0 1 50 761 Tm (Analyse du patrimoine ABAP et refactorisation du report ALV ZPROG_ALV_YMEProjet : extension) Tj
+/F1 9.5 Tf 1 0 0 1 50 747 Tm (VS Code A-CorePilot) Tj
+/F1 9.5 Tf 1 0 0 1 50 733 Tm (Exercice : migration progressive Clean Core d'un report ALV classique) Tj
+/F1 9.5 Tf 1 0 0 1 50 719 Tm (Copie de travail : ZPROG_ALV_YME_CC) Tj
+/F1 9.5 Tf 1 0 0 1 50 705 Tm (Date : 11 septembre 2026) Tj
+/F1 9.5 Tf 1 0 0 1 50 691 Tm (Contexte : travail d'exploration encadré avec validation dans SAP Logon) Tj
+/F1 9.5 Tf 1 0 0 1 50 677 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 663 Tm (1. Résumé exécutif) Tj
+/F1 9.5 Tf 1 0 0 1 50 641 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 627 Tm (Le travail a porté sur deux axes. Le premier consistait à rendre A-CorePilot capable) Tj
+/F1 9.5 Tf 1 0 0 1 50 613 Tm (d'inventorier les objets Z/Y, d'exécuter ATC et de construire un graphe dont les compteurs) Tj
+/F1 9.5 Tf 1 0 0 1 50 599 Tm (sont traçables. Le second consistait à appliquer une démarche Clean Core à un report ALV) Tj
+/F1 9.5 Tf 1 0 0 1 50 585 Tm (existant sans modifier directement l'original.) Tj
+/F1 9.5 Tf 1 0 0 1 50 571 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 557 Tm (- Distinction entre un résultat where-used vide et une analyse échouée ou non supportée.) Tj
+/F1 9.5 Tf 1 0 0 1 50 543 Tm (- Provider ABAP autour de RS_EU_CROSSREF pour obtenir des callers identifiables.) Tj
+/F1 9.5 Tf 1 0 0 1 50 529 Tm (- Métriques du graphe calculées uniquement depuis les relations SAP_CROSSREF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 515 Tm (- Résultats regex, ATC, ADT générique et LLM conservés comme candidats.) Tj
+/F1 9.5 Tf 1 0 0 1 50 501 Tm (- Classification R5 déterministe, explicable et sans LLM.) Tj
+/F1 9.5 Tf 1 0 0 1 50 487 Tm (- Copie, stabilisation et refactorisation du report ALV.) Tj
+/F1 9.5 Tf 1 0 0 1 50 473 Tm (- Recherche d'APIs Released et confinement des accès fiscaux legacy derrière un wrapper.) Tj
+/F1 9.5 Tf 1 0 0 1 50 459 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 445 Tm (2. Problèmes initiaux dans A-CorePilot) Tj
+/F1 9.5 Tf 1 0 0 1 50 423 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 409 Tm (- Des includes PROG/I affichaient zéro caller alors que leur programme principal les) Tj
+/F1 9.5 Tf 1 0 0 1 50 395 Tm (incluait.) Tj
+/F1 9.5 Tf 1 0 0 1 50 381 Tm (- Un zéro pouvait aussi représenter un appel SAP échoué ou une réponse inutilisable.) Tj
+/F1 9.5 Tf 1 0 0 1 50 367 Tm (- Des composants techniques de classes étaient comptés comme callers de leur propre classe.) Tj
+/F1 9.5 Tf 1 0 0 1 50 353 Tm (- Les relations incoming/outgoing ne correspondaient pas toujours à SAP GUI.) Tj
+/F1 9.5 Tf 1 0 0 1 50 339 Tm (- Le graphe pouvait sembler vide après navigation malgré sa persistance.) Tj
+/F1 9.5 Tf 1 0 0 1 50 325 Tm (- ATC sur près de cent objets rendait le scan long et vulnérable aux interruptions.) Tj
+/F1 9.5 Tf 1 0 0 1 50 311 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 297 Tm (Affichage | Signification adoptée |) Tj
+/F1 9.5 Tf 1 0 0 1 50 283 Tm (0 | La recherche SAP a réussi et aucune relation vérifiée n'a été trouvée. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 269 Tm (- | Valeur inconnue : type non supporté, appel échoué, réponse inutilisable ou scan non) Tj
+/F1 9.5 Tf 1 0 0 1 50 255 Tm (terminé. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 241 Tm (n > 0 | Nombre d'objets utilisateurs uniques associés à des relations SAP vérifiées. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 227 Tm (Principe : l'absence de preuve n'est pas une preuve d'absence. Un échec ne doit jamais être) Tj
+/F1 9.5 Tf 1 0 0 1 50 213 Tm (converti en zéro.) Tj
+/F1 9.5 Tf 1 0 0 1 50 199 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 185 Tm (3. Provider ABAP de dépendances) Tj
+/F1 9.5 Tf 1 0 0 1 50 163 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 149 Tm (Le where-used ADT générique n'étant pas cohérent pour tous les types techniques, une) Tj
+/F1 9.5 Tf 1 0 0 1 50 135 Tm (interface et une classe provider ont été créées côté SAP autour de RS_EU_CROSSREF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 121 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 107 Tm (A-CorePilot -> /zacore/dependencies -> ZCL_ACORE_DEPENDENCY_HTTP -> ZCL_ACORE_DEPENDENCY_SAP) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 1/17) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 4003 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (-> RS_EU_CROSSREF) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (L'interface ZIF_ACORE_DEPENDENCY_PROVIDER expose GET_USED_BY avec le nom et la classe de) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (l'objet en entrée, puis les relations, le statut, le message et le compteur en sortie.) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm (CALL FUNCTION 'RS_EU_CROSSREF') Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm (EXPORTING) Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm (i_find_obj_cls = lv_object_class) Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm (no_dialog      = 'X') Tj
+/F1 9.5 Tf 1 0 0 1 50 688 Tm (TABLES) Tj
+/F1 9.5 Tf 1 0 0 1 50 674 Tm (i_findstrings  = lt_findstrings) Tj
+/F1 9.5 Tf 1 0 0 1 50 660 Tm (o_founds       = lt_founds.) Tj
+/F1 9.5 Tf 1 0 0 1 50 646 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 632 Tm (Les résultats RSFINDLST sont normalisés, les préfixes comme \\IC: sont retirés, puis les) Tj
+/F1 9.5 Tf 1 0 0 1 50 618 Tm (relations sont dédupliquées par source, cible, classes et nature. Le compteur est le nombre) Tj
+/F1 9.5 Tf 1 0 0 1 50 604 Tm (de sources uniques et non le nombre brut d'occurrences.) Tj
+/F1 9.5 Tf 1 0 0 1 50 590 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 576 Tm (Objet testé | Classe | Résultat observé |) Tj
+/F1 9.5 Tf 1 0 0 1 50 562 Tm (ZCAP_1_TOP, ZCAP_1_SS, ZCAP_1_CLA | REPS | Un report parent vérifié pour chaque include. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 548 Tm (ZCL_ZAJ_BIAT_RESERVATI_DPC | CLAS | Trois utilisateurs uniques pendant le test. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 534 Tm (ZCL_ACCESS_PAYMENTS | CLAS | Composants générés internes éliminés du compteur métier. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 520 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 506 Tm (4. Graphe de dépendances fiable) Tj
+/F1 9.5 Tf 1 0 0 1 50 484 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 470 Tm (Catégorie | Sources | Effet |) Tj
+/F1 9.5 Tf 1 0 0 1 50 456 Tm (SAP Verified | SAP_CROSSREF | Alimente Where Used, Dependencies, Total Impact, Depth, cycles) Tj
+/F1 9.5 Tf 1 0 0 1 50 442 Tm (et chemins. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 428 Tm (Candidate | Regex, ATC, ADT générique, métadonnées ou LLM | Visible sur demande, mais) Tj
+/F1 9.5 Tf 1 0 0 1 50 414 Tm (n'augmente aucun compteur de production. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 400 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 386 Tm (- Where Used / incoming : objets qui utilisent l'objet sélectionné.) Tj
+/F1 9.5 Tf 1 0 0 1 50 372 Tm (- Dependencies / outgoing : objets utilisés par l'objet sélectionné.) Tj
+/F1 9.5 Tf 1 0 0 1 50 358 Tm (- Total Impact : ensemble transitif des utilisateurs vérifiés susceptibles d'être affectés.) Tj
+/F1 9.5 Tf 1 0 0 1 50 344 Tm (L'option Candidate edges est désactivée par défaut. Le cache et le graphe sont versionnés,) Tj
+/F1 9.5 Tf 1 0 0 1 50 330 Tm (écrits atomiquement et sauvegardés par checkpoints partial. Un seul scan peut fonctionner à) Tj
+/F1 9.5 Tf 1 0 0 1 50 316 Tm (la fois et les erreurs inattendues sont remontées dans l'interface.) Tj
+/F1 9.5 Tf 1 0 0 1 50 302 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 288 Tm (5. Classification R5 sans LLM) Tj
+/F1 9.5 Tf 1 0 0 1 50 266 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 252 Tm (La classification LLM a été remplacée par des règles déterministes basées sur les) Tj
+/F1 9.5 Tf 1 0 0 1 50 238 Tm (métadonnées SAP, les findings ATC, le code ABAP et les conventions de nommage. Chaque) Tj
+/F1 9.5 Tf 1 0 0 1 50 224 Tm (décision conserve son type, sa confiance, sa source et sa preuve.) Tj
+/F1 9.5 Tf 1 0 0 1 50 210 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 196 Tm (Type | Exemples de preuve | Risque |) Tj
+/F1 9.5 Tf 1 0 0 1 50 182 Tm (CLASSICAL_MODIFICATION | Finding ATC de modification directe | 1,00 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 168 Tm (IMPLICIT_ENHANCEMENT | Métadonnée/finding « implicit enhancement » | 0,85 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 154 Tm (EXPLICIT_ENHANCEMENT | ENHANCEMENT-POINT ou ENHANCEMENT-SECTION | 0,70 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 140 Tm (BADI_IMPLEMENTATION | IF_EX_*, GET BADI, CALL BADI | 0,55 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 126 Tm (CUSTOM_DEVELOPMENT | Objet Z/Y sans preuve plus forte | 0,30 |) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 2/17) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 3279 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (WRAPPER_PROXY | Wrapper/Proxy/Adapter/Façade avec délégation | 0,15 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (La colonne R5 Type est disponible dans Object Inventory. Son infobulle affiche la provenance) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (et la preuve.) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 744 Tm (6. Exercice Clean Core sur le report ALV) Tj
+/F1 9.5 Tf 1 0 0 1 50 722 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 708 Tm (6.1 État initial et baseline ATC) Tj
+/F1 9.5 Tf 1 0 0 1 50 690 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 676 Tm (ZPROG_ALV_YME utilisait un ALV classique, des structures SLIS_*, des textes codés en dur,) Tj
+/F1 9.5 Tf 1 0 0 1 50 662 Tm (des SELECT SINGLE et des accès directs à BKPF, BSEG, EKPO, T030K, A003 et KONP. ATC) Tj
+/F1 9.5 Tf 1 0 0 1 50 648 Tm (signalait des APIs internes/classiques, lectures DDIC, sélections potentiellement non) Tj
+/F1 9.5 Tf 1 0 0 1 50 634 Tm (uniques et éléments de texte manquants.) Tj
+/F1 9.5 Tf 1 0 0 1 50 620 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 606 Tm (6.2 Protection du programme original) Tj
+/F1 9.5 Tf 1 0 0 1 50 588 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 574 Tm (Une copie cohérente a été créée avec Source, Text Elements et Includes :) Tj
+/F1 9.5 Tf 1 0 0 1 50 560 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 546 Tm (ZPROG_ALV_YME_CC) Tj
+/F1 9.5 Tf 1 0 0 1 50 532 Tm (ZPROG_ALV_YME_CC_TOP) Tj
+/F1 9.5 Tf 1 0 0 1 50 518 Tm (ZPROG_ALV_YME_CC_SS) Tj
+/F1 9.5 Tf 1 0 0 1 50 504 Tm (ZPROG_ALV_YME_CC_CLA) Tj
+/F1 9.5 Tf 1 0 0 1 50 490 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 476 Tm (L'original est resté la référence fonctionnelle. La gestion des versions SAP a été utilisée) Tj
+/F1 9.5 Tf 1 0 0 1 50 462 Tm (pour comparer la version active et les versions locales.) Tj
+/F1 9.5 Tf 1 0 0 1 50 448 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 434 Tm (6.3 Structure et corrections syntaxiques) Tj
+/F1 9.5 Tf 1 0 0 1 50 416 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 402 Tm (REPORT zprog_alv_yme_cc.) Tj
+/F1 9.5 Tf 1 0 0 1 50 388 Tm (INCLUDE zprog_alv_yme_cc_top.) Tj
+/F1 9.5 Tf 1 0 0 1 50 374 Tm (INCLUDE zprog_alv_yme_cc_ss.) Tj
+/F1 9.5 Tf 1 0 0 1 50 360 Tm (INCLUDE zprog_alv_yme_cc_cla.) Tj
+/F1 9.5 Tf 1 0 0 1 50 346 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 332 Tm (INITIALIZATION.) Tj
+/F1 9.5 Tf 1 0 0 1 50 318 Tm (CREATE OBJECT go_report.) Tj
+/F1 9.5 Tf 1 0 0 1 50 304 Tm (START-OF-SELECTION.) Tj
+/F1 9.5 Tf 1 0 0 1 50 290 Tm (go_report->get_data\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 276 Tm (go_report->show_alv\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 262 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 248 Tm (- Ajout de CLASS lcl_report DEFINITION DEFERRED. avant la référence à la classe.) Tj
+/F1 9.5 Tf 1 0 0 1 50 234 Tm (- Correction des blocs DATA, virgules et points.) Tj
+/F1 9.5 Tf 1 0 0 1 50 220 Tm (- Déclaration publique des méthodes appelées.) Tj
+/F1 9.5 Tf 1 0 0 1 50 206 Tm (- Suppression de l'événement inexistant PF_STATUS_SET sur CL_GUI_ALV_GRID.) Tj
+/F1 9.5 Tf 1 0 0 1 50 192 Tm (- Activation des includes avant le programme principal.) Tj
+/F1 9.5 Tf 1 0 0 1 50 178 Tm (Résultat : « No syntax errors found in Report ZPROG_ALV_YME_CC », puis affichage de l'écran) Tj
+/F1 9.5 Tf 1 0 0 1 50 164 Tm (de sélection avec F8.) Tj
+/F1 9.5 Tf 1 0 0 1 50 150 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 136 Tm (6.4 Text Pool) Tj
+/F1 9.5 Tf 1 0 0 1 50 118 Tm () Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 3/17) Tj
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 3491 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (Les chaînes visibles ont été externalisées dans les Text Symbols 001 à 024 : titres des) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (blocs, messages « Aucune donnée trouvée » et « Erreur lors de l'affichage ALV », ainsi que) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (les titres des colonnes comptables et fiscales.) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm (MESSAGE text-003 TYPE 'S' DISPLAY LIKE 'E'.) Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm (Le Text Pool a été enregistré et activé en français avant de relancer ATC.) Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 688 Tm (6.5 Modernisation de l'ALV) Tj
+/F1 9.5 Tf 1 0 0 1 50 670 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 656 Tm (Les appels REUSE_ALV_* et les structures SLIS_* ont été retirés au profit de SALV :) Tj
+/F1 9.5 Tf 1 0 0 1 50 642 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 628 Tm (DATA lo_alv TYPE REF TO cl_salv_table.) Tj
+/F1 9.5 Tf 1 0 0 1 50 614 Tm (cl_salv_table=>factory\() Tj
+/F1 9.5 Tf 1 0 0 1 50 600 Tm (IMPORTING r_salv_table = lo_alv) Tj
+/F1 9.5 Tf 1 0 0 1 50 586 Tm (CHANGING  t_table      = mt_result \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 572 Tm (lo_alv->get_columns\( \)->set_optimize\( abap_true \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 558 Tm (lo_alv->get_functions\( \)->set_all\( abap_true \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 544 Tm (lo_alv->display\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 530 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 516 Tm (SALV modernise l'affichage SAP GUI. Une cible ABAP Cloud stricte peut toutefois nécessiter) Tj
+/F1 9.5 Tf 1 0 0 1 50 502 Tm (RAP/Fiori.) Tj
+/F1 9.5 Tf 1 0 0 1 50 488 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 474 Tm (7. Recherche des APIs Released) Tj
+/F1 9.5 Tf 1 0 0 1 50 452 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 438 Tm (Objet interne | Successeur étudié | Conclusion |) Tj
+/F1 9.5 Tf 1 0 0 1 50 424 Tm (BKPF | I_JournalEntry | Released ; sémantique à valider. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 410 Tm (BSEG | I_OperationalAcctgDocItem | Released ; candidat pour les postes comptables. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 396 Tm (EKPO | I_PurchaseOrderItemAPI01 | Released ; candidat pour les postes de commande. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 382 Tm (KONP | I_SlsPrcgConditionRecord | Released, mais aucune valeur exploitable pour le test) Tj
+/F1 9.5 Tf 1 0 0 1 50 368 Tm (fiscal. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 354 Tm (T030K / A003 | Aucun successeur confirmé | Accès legacy isolé et documenté. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 340 Tm (Un successeur proposé dans le Cloudification Repository n'est pas automatiquement) Tj
+/F1 9.5 Tf 1 0 0 1 50 326 Tm (équivalent. Les champs, filtres, cardinalités et données ont été vérifiés dans le système) Tj
+/F1 9.5 Tf 1 0 0 1 50 312 Tm (réel.) Tj
+/F1 9.5 Tf 1 0 0 1 50 298 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 284 Tm (8. Wrapper fiscal) Tj
+/F1 9.5 Tf 1 0 0 1 50 262 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 248 Tm (ZPROG_ALV_YME_CC -> ZIF_YME_TAX_PROVIDER -> ZCL_YME_TAX_LEGACY -> T030K / A003 / KONP) Tj
+/F1 9.5 Tf 1 0 0 1 50 234 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 220 Tm (8.1 Interface) Tj
+/F1 9.5 Tf 1 0 0 1 50 202 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 188 Tm (INTERFACE zif_yme_tax_provider PUBLIC.) Tj
+/F1 9.5 Tf 1 0 0 1 50 174 Tm (METHODS get_tax_data) Tj
+/F1 9.5 Tf 1 0 0 1 50 160 Tm (IMPORTING iv_tax_code       TYPE mwskz) Tj
+/F1 9.5 Tf 1 0 0 1 50 146 Tm (EXPORTING ev_tax_account    TYPE saknr) Tj
+/F1 9.5 Tf 1 0 0 1 50 132 Tm (ev_tax_rate       TYPE kbetr) Tj
+/F1 9.5 Tf 1 0 0 1 50 118 Tm (ev_account_found  TYPE abap_bool) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 4/17) Tj
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Length 3159 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (ev_rate_found     TYPE abap_bool.) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (ENDINTERFACE.) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 758 Tm (8.2 Implémentation legacy) Tj
+/F1 9.5 Tf 1 0 0 1 50 740 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 726 Tm (METHOD zif_yme_tax_provider~get_tax_data.) Tj
+/F1 9.5 Tf 1 0 0 1 50 712 Tm (CLEAR: ev_tax_account, ev_tax_rate,) Tj
+/F1 9.5 Tf 1 0 0 1 50 698 Tm (ev_account_found, ev_rate_found.) Tj
+/F1 9.5 Tf 1 0 0 1 50 684 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 670 Tm (SELECT SINGLE konts FROM t030k) Tj
+/F1 9.5 Tf 1 0 0 1 50 656 Tm (WHERE ktopl = 'MXCA' AND ktosl = 'VST') Tj
+/F1 9.5 Tf 1 0 0 1 50 642 Tm (AND land1 = 'TN' AND mwskz = @iv_tax_code) Tj
+/F1 9.5 Tf 1 0 0 1 50 628 Tm (INTO @ev_tax_account.) Tj
+/F1 9.5 Tf 1 0 0 1 50 614 Tm (IF sy-subrc = 0. ev_account_found = abap_true. ENDIF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 600 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 586 Tm (SELECT SINGLE knumh FROM a003) Tj
+/F1 9.5 Tf 1 0 0 1 50 572 Tm (WHERE kappl = 'TX' AND kschl = 'MWVS') Tj
+/F1 9.5 Tf 1 0 0 1 50 558 Tm (AND aland = 'TN' AND mwskz = @iv_tax_code) Tj
+/F1 9.5 Tf 1 0 0 1 50 544 Tm (INTO @DATA\(lv_knumh\).) Tj
+/F1 9.5 Tf 1 0 0 1 50 530 Tm (IF sy-subrc <> 0. RETURN. ENDIF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 516 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 502 Tm (SELECT SINGLE kbetr FROM konp) Tj
+/F1 9.5 Tf 1 0 0 1 50 488 Tm (WHERE knumh = @lv_knumh AND kopos = '01') Tj
+/F1 9.5 Tf 1 0 0 1 50 474 Tm (INTO @DATA\(lv_rate\).) Tj
+/F1 9.5 Tf 1 0 0 1 50 460 Tm (IF sy-subrc = 0.) Tj
+/F1 9.5 Tf 1 0 0 1 50 446 Tm (ev_tax_rate = lv_rate / 10.) Tj
+/F1 9.5 Tf 1 0 0 1 50 432 Tm (ev_rate_found = abap_true.) Tj
+/F1 9.5 Tf 1 0 0 1 50 418 Tm (ENDIF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 404 Tm (ENDMETHOD.) Tj
+/F1 9.5 Tf 1 0 0 1 50 390 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 376 Tm (8.3 Wrapper comparé à une classe simple) Tj
+/F1 9.5 Tf 1 0 0 1 50 358 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 344 Tm (Critère | Classe couplée directement | Wrapper avec interface |) Tj
+/F1 9.5 Tf 1 0 0 1 50 330 Tm (Dépendance du report | Tables SAP internes | Contrat ZIF_YME_TAX_PROVIDER |) Tj
+/F1 9.5 Tf 1 0 0 1 50 316 Tm (Dette technique | Dispersée | Confinée dans ZCL_YME_TAX_LEGACY |) Tj
+/F1 9.5 Tf 1 0 0 1 50 302 Tm (Test | Difficile à isoler | Provider testable séparément |) Tj
+/F1 9.5 Tf 1 0 0 1 50 288 Tm (Remplacement futur | Modification du report | Nouvelle implémentation de l'interface |) Tj
+/F1 9.5 Tf 1 0 0 1 50 274 Tm (Clean Core strict | Non | Pas encore, mais dette localisée |) Tj
+/F1 9.5 Tf 1 0 0 1 50 260 Tm (Limite : un wrapper ne rend pas une table interne Released. Il confine la dette jusqu'à la) Tj
+/F1 9.5 Tf 1 0 0 1 50 246 Tm (disponibilité d'une API officielle compatible.) Tj
+/F1 9.5 Tf 1 0 0 1 50 232 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 218 Tm (8.4 Test fonctionnel) Tj
+/F1 9.5 Tf 1 0 0 1 50 200 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 186 Tm (GET_TAX_DATA a été exécutée dans SE24 avec IV_TAX_CODE = D1 :) Tj
+/F1 9.5 Tf 1 0 0 1 50 172 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 158 Tm (EV_TAX_ACCOUNT   = 4366100000) Tj
+/F1 9.5 Tf 1 0 0 1 50 144 Tm (EV_TAX_RATE      = 18,00) Tj
+/F1 9.5 Tf 1 0 0 1 50 130 Tm (EV_ACCOUNT_FOUND = X) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 5/17) Tj
+ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 13 0 R >>
+endobj
+15 0 obj
+<< /Length 3775 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (EV_RATE_FOUND    = X) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (Le résultat a été comparé aux données de T030K, A003 et KONP afin de préserver le) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (comportement métier.) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 730 Tm (9. Méthode de validation) Tj
+/F1 9.5 Tf 1 0 0 1 50 708 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 694 Tm (- Contrôle syntaxique et activation de tous les includes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 680 Tm (- Exécution de l'original et de la copie avec les mêmes critères.) Tj
+/F1 9.5 Tf 1 0 0 1 50 666 Tm (- Comparaison du nombre de lignes, des clés, du compte TVA et du taux.) Tj
+/F1 9.5 Tf 1 0 0 1 50 652 Tm (- Relance ATC après chaque groupe de changements.) Tj
+/F1 9.5 Tf 1 0 0 1 50 638 Tm (- Test des CDS Released dans le système sans supposer leur équivalence.) Tj
+/F1 9.5 Tf 1 0 0 1 50 624 Tm (- Vérification d'un échantillon Where Used dans SAP GUI.) Tj
+/F1 9.5 Tf 1 0 0 1 50 610 Tm (- Dans A-CorePilot, validation avec Candidate edges désactivé.) Tj
+/F1 9.5 Tf 1 0 0 1 50 596 Tm (- Conservation des captures avant/après et justification des exceptions.) Tj
+/F1 9.5 Tf 1 0 0 1 50 582 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 568 Tm (10. Tests du projet) Tj
+/F1 9.5 Tf 1 0 0 1 50 546 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 532 Tm (npm run compile) Tj
+/F1 9.5 Tf 1 0 0 1 50 518 Tm (npm run test:graph) Tj
+/F1 9.5 Tf 1 0 0 1 50 504 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 490 Tm (La dernière validation réalisée pendant le développement comptait 16 tests réussis et aucun) Tj
+/F1 9.5 Tf 1 0 0 1 50 476 Tm (échec. Les scénarios couvrent les includes, les callers anonymes rejetés, les candidats) Tj
+/F1 9.5 Tf 1 0 0 1 50 462 Tm (exclus des métriques, les BAdI, ATC et les catégories R5.) Tj
+/F1 9.5 Tf 1 0 0 1 50 448 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 434 Tm (11. Bilan avant / après) Tj
+/F1 9.5 Tf 1 0 0 1 50 412 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 398 Tm (Avant | Après |) Tj
+/F1 9.5 Tf 1 0 0 1 50 384 Tm (Zéro ambigu en cas d'échec | Zéro réservé au succès vide ; tiret pour inconnu |) Tj
+/F1 9.5 Tf 1 0 0 1 50 370 Tm (Sources mélangées | Métriques uniquement SAP_CROSSREF |) Tj
+/F1 9.5 Tf 1 0 0 1 50 356 Tm (Regex considérée comme vérité | Regex conservée comme candidate |) Tj
+/F1 9.5 Tf 1 0 0 1 50 342 Tm (Ancien cache potentiellement affiché | Cache versionné, atomique et checkpoints |) Tj
+/F1 9.5 Tf 1 0 0 1 50 328 Tm (R5 basé sur LLM | R5 déterministe avec preuve |) Tj
+/F1 9.5 Tf 1 0 0 1 50 314 Tm (Original modifié directement | Copie ZPROG_ALV_YME_CC isolée |) Tj
+/F1 9.5 Tf 1 0 0 1 50 300 Tm (ALV classique et SLIS | SALV pour la modernisation SAP GUI |) Tj
+/F1 9.5 Tf 1 0 0 1 50 286 Tm (Textes codés en dur | Text Symbols français |) Tj
+/F1 9.5 Tf 1 0 0 1 50 272 Tm (Accès fiscaux dispersés | Confinés dans ZCL_YME_TAX_LEGACY |) Tj
+/F1 9.5 Tf 1 0 0 1 50 258 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 244 Tm (12. Limites et prochaines étapes) Tj
+/F1 9.5 Tf 1 0 0 1 50 222 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 208 Tm (- La précision dépend des index cross-reference du système SAP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 194 Tm (- Les dépendances dynamiques ne sont pas toutes détectables statiquement.) Tj
+/F1 9.5 Tf 1 0 0 1 50 180 Tm (- Le scan est limité à 100 objets pour maîtriser la durée.) Tj
+/F1 9.5 Tf 1 0 0 1 50 166 Tm (- Les tables du wrapper doivent être remplacées lorsqu'une API Released compatible apparaît.) Tj
+/F1 9.5 Tf 1 0 0 1 50 152 Tm (- Les objets de production doivent quitter $TMP et rejoindre un package transportable.) Tj
+/F1 9.5 Tf 1 0 0 1 50 138 Tm (- Une cible stricte doit étudier RAP/Fiori et les contraintes ABAP Cloud.) Tj
+/F1 9.5 Tf 1 0 0 1 50 124 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 110 Tm (13. Architecture technique détaillée d'A-CorePilot) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 6/17) Tj
+ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 15 0 R >>
+endobj
+17 0 obj
+<< /Length 4106 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (A-CorePilot est une extension VS Code organisée en couches. Cette séparation évite que) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (l'interface utilisateur connaisse les détails des protocoles SAP et permet de tester les) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (règles métier indépendamment du webview.) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm (Couche | Responsabilité | Principaux composants |) Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm (Présentation | Inventaire, progression du scan, graphes, filtres et détails. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm (ObjectInventory, DependencyGraphView, SidebarProvider |) Tj
+/F1 9.5 Tf 1 0 0 1 50 688 Tm (Orchestration | Enchaînement des phases, gestion des erreurs et sauvegardes. | ScannerAgent,) Tj
+/F1 9.5 Tf 1 0 0 1 50 674 Tm (DashboardPanel |) Tj
+/F1 9.5 Tf 1 0 0 1 50 660 Tm (Analyse | ATC, dette, classification R5 et enrichissement. | AtcAgent, DebtAnalystAgent,) Tj
+/F1 9.5 Tf 1 0 0 1 50 646 Tm (ModificationTypeClassifier |) Tj
+/F1 9.5 Tf 1 0 0 1 50 632 Tm (Découverte SAP | Recherche Z/Y, source, métadonnées et relations. | ObjectDiscovery,) Tj
+/F1 9.5 Tf 1 0 0 1 50 618 Tm (AdtClient, AtcRunner |) Tj
+/F1 9.5 Tf 1 0 0 1 50 604 Tm (Modèle graphe | Noeuds, arêtes, métriques, cycles et impact transitif. | DependencyGraph,) Tj
+/F1 9.5 Tf 1 0 0 1 50 590 Tm (GraphSerializer |) Tj
+/F1 9.5 Tf 1 0 0 1 50 576 Tm (Persistance | Cache versionné des objets et du graphe. | scan-results.json,) Tj
+/F1 9.5 Tf 1 0 0 1 50 562 Tm (dependency-graph.json |) Tj
+/F1 9.5 Tf 1 0 0 1 50 548 Tm (SAP backend | Where-used normalisé et exposé en JSON. | ZIF_ACORE_DEPENDENCY_PROVIDER,) Tj
+/F1 9.5 Tf 1 0 0 1 50 534 Tm (ZCL_ACORE_DEPENDENCY_SAP, ZCL_ACORE_DEPENDENCY_HTTP |) Tj
+/F1 9.5 Tf 1 0 0 1 50 520 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 506 Tm (13.1 Flux général d'un scan) Tj
+/F1 9.5 Tf 1 0 0 1 50 488 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 474 Tm (- Lecture de l'hôte, du client et du nom utilisateur depuis les paramètres VS Code.) Tj
+/F1 9.5 Tf 1 0 0 1 50 460 Tm (- Lecture du mot de passe depuis le stockage sécurisé.) Tj
+/F1 9.5 Tf 1 0 0 1 50 446 Tm (- Ping de l'endpoint ADT afin de distinguer un problème de connexion d'une erreur d'analyse.) Tj
+/F1 9.5 Tf 1 0 0 1 50 432 Tm (- Invalidation logique de l'ancien cache par création d'un checkpoint Discovery vide.) Tj
+/F1 9.5 Tf 1 0 0 1 50 418 Tm (- Recherche des objets Z* et Y* des types PROG, CLAS, FUGR et INTF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 404 Tm (- Déduplication par type et nom.) Tj
+/F1 9.5 Tf 1 0 0 1 50 390 Tm (- Limitation de l'échantillon à 100 objets pendant la phase de test.) Tj
+/F1 9.5 Tf 1 0 0 1 50 376 Tm (- Enrichissement par petits lots pour protéger le système SAP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 362 Tm (- Appel du provider SAP pour les callers vérifiés.) Tj
+/F1 9.5 Tf 1 0 0 1 50 348 Tm (- Lecture du source et calcul LOC lorsque le type le permet.) Tj
+/F1 9.5 Tf 1 0 0 1 50 334 Tm (- Extraction des relations candidates depuis le source.) Tj
+/F1 9.5 Tf 1 0 0 1 50 320 Tm (- Lecture de l'historique de modification lorsque l'objet possède un endpoint autonome.) Tj
+/F1 9.5 Tf 1 0 0 1 50 306 Tm (- Construction et sauvegarde d'un premier graphe.) Tj
+/F1 9.5 Tf 1 0 0 1 50 292 Tm (- Exécution ATC uniquement sur les objets autonomes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 278 Tm (- Enrichissement CRV lorsqu'un successeur est disponible.) Tj
+/F1 9.5 Tf 1 0 0 1 50 264 Tm (- Calcul de la dette et de l'effort.) Tj
+/F1 9.5 Tf 1 0 0 1 50 250 Tm (- Reconstruction du graphe avec les données finales.) Tj
+/F1 9.5 Tf 1 0 0 1 50 236 Tm (- Écriture atomique du résultat complet et notification de l'interface.) Tj
+/F1 9.5 Tf 1 0 0 1 50 222 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 208 Tm (13.2 Modèle d'un objet enrichi) Tj
+/F1 9.5 Tf 1 0 0 1 50 190 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 176 Tm (EnrichedObject) Tj
+/F1 9.5 Tf 1 0 0 1 50 162 Tm (name, type, uri, packageName, description) Tj
+/F1 9.5 Tf 1 0 0 1 50 148 Tm (callerCount, callerScanStatus, callers) Tj
+/F1 9.5 Tf 1 0 0 1 50 134 Tm (calleeCount, dependencies, impactCount, graphDepth) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 7/17) Tj
+ET
+endstream
+endobj
+18 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 17 0 R >>
+endobj
+19 0 obj
+<< /Length 4070 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (loc, lastChangedDate, changesLast12Months) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (atcFindings, classification) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (modType, modTypeConfidence, modTypeSource, modTypeEvidence) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (debtScore, effortSP, riskScore, riskLevel) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm (crvEntry) Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm (La présence simultanée de la valeur et de son statut est essentielle. Sans callerScanStatus,) Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm (la valeur numérique seule ne permet pas de savoir si zéro signifie « aucun caller » ou «) Tj
+/F1 9.5 Tf 1 0 0 1 50 688 Tm (analyse impossible ».) Tj
+/F1 9.5 Tf 1 0 0 1 50 674 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 660 Tm (14. Chronologie complète des travaux) Tj
+/F1 9.5 Tf 1 0 0 1 50 638 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 624 Tm (- Lancement du projet depuis le workspace et observation de l'inventaire.) Tj
+/F1 9.5 Tf 1 0 0 1 50 610 Tm (- Identification d'objets affichés avec zéro caller ou un tiret.) Tj
+/F1 9.5 Tf 1 0 0 1 50 596 Tm (- Analyse spécifique des sous-types PROG/I.) Tj
+/F1 9.5 Tf 1 0 0 1 50 582 Tm (- Vérification manuelle des reports ZCAP_1 et de ses includes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 568 Tm (- Constat que SAP GUI ne propose pas toujours une Where-Used List directe sur un include.) Tj
+/F1 9.5 Tf 1 0 0 1 50 554 Tm (- Comparaison des relations du graphe avec SE24 et les résultats SAP GUI.) Tj
+/F1 9.5 Tf 1 0 0 1 50 540 Tm (- Identification du faux comptage des composants générés de classes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 526 Tm (- Test de RS_EU_CROSSREF dans un programme ABAP dédié.) Tj
+/F1 9.5 Tf 1 0 0 1 50 512 Tm (- Étude des structures RINFOOBJ, RSFIND et RSFINDLST.) Tj
+/F1 9.5 Tf 1 0 0 1 50 498 Tm (- Création d'une structure de relation A-CorePilot et de son type table.) Tj
+/F1 9.5 Tf 1 0 0 1 50 484 Tm (- Création de l'interface du provider de dépendances.) Tj
+/F1 9.5 Tf 1 0 0 1 50 470 Tm (- Création de l'implémentation SAP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 456 Tm (- Normalisation et déduplication des utilisateurs.) Tj
+/F1 9.5 Tf 1 0 0 1 50 442 Tm (- Création du handler HTTP et publication sous /zacore/dependencies.) Tj
+/F1 9.5 Tf 1 0 0 1 50 428 Tm (- Activation du service ICF et test depuis le navigateur/terminal.) Tj
+/F1 9.5 Tf 1 0 0 1 50 414 Tm (- Connexion de l'extension TypeScript au nouvel endpoint.) Tj
+/F1 9.5 Tf 1 0 0 1 50 400 Tm (- Test de ZCAP_1_TOP, puis des classes et DPC.) Tj
+/F1 9.5 Tf 1 0 0 1 50 386 Tm (- Correction de la distinction entre relation technique interne et caller externe.) Tj
+/F1 9.5 Tf 1 0 0 1 50 372 Tm (- Séparation des arêtes vérifiées et candidates.) Tj
+/F1 9.5 Tf 1 0 0 1 50 358 Tm (- Recalcul de Where Used, Dependencies et Impact depuis les seules preuves SAP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 344 Tm (- Ajout du cache versionné et des checkpoints.) Tj
+/F1 9.5 Tf 1 0 0 1 50 330 Tm (- Blocage des scans simultanés.) Tj
+/F1 9.5 Tf 1 0 0 1 50 316 Tm (- Création du classifieur déterministe R5.) Tj
+/F1 9.5 Tf 1 0 0 1 50 302 Tm (- Ajout de la colonne R5 Type et de son explication.) Tj
+/F1 9.5 Tf 1 0 0 1 50 288 Tm (- Compilation et exécution des tests automatisés.) Tj
+/F1 9.5 Tf 1 0 0 1 50 274 Tm (- Démarrage de l'exercice ALV par une baseline ATC.) Tj
+/F1 9.5 Tf 1 0 0 1 50 260 Tm (- Création d'une copie séparée du report.) Tj
+/F1 9.5 Tf 1 0 0 1 50 246 Tm (- Correction progressive des includes et de la classe locale.) Tj
+/F1 9.5 Tf 1 0 0 1 50 232 Tm (- Externalisation des textes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 218 Tm (- Modernisation de l'ALV.) Tj
+/F1 9.5 Tf 1 0 0 1 50 204 Tm (- Recherche des successeurs Released.) Tj
+/F1 9.5 Tf 1 0 0 1 50 190 Tm (- Test réel des vues CDS proposées.) Tj
+/F1 9.5 Tf 1 0 0 1 50 176 Tm (- Constat d'absence d'équivalence fiscale suffisante.) Tj
+/F1 9.5 Tf 1 0 0 1 50 162 Tm (- Création du wrapper fiscal.) Tj
+/F1 9.5 Tf 1 0 0 1 50 148 Tm (- Test du code TVA D1 et comparaison des résultats.) Tj
+/F1 9.5 Tf 1 0 0 1 50 134 Tm (- Nouvelle exécution ATC et documentation des findings résiduels.) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 8/17) Tj
+ET
+endstream
+endobj
+20 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 19 0 R >>
+endobj
+21 0 obj
+<< /Length 2947 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 786 Tm (15. Algorithme détaillé du Where Used vérifié) Tj
+/F1 9.5 Tf 1 0 0 1 50 764 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 750 Tm (15.1 Entrées) Tj
+/F1 9.5 Tf 1 0 0 1 50 732 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 718 Tm (- Nom normalisé de l'objet, par exemple ZCAP_1_TOP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 704 Tm (- Classe Repository attendue, par exemple REPS ou CLAS.) Tj
+/F1 9.5 Tf 1 0 0 1 50 690 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 676 Tm (15.2 États de sortie) Tj
+/F1 9.5 Tf 1 0 0 1 50 658 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 644 Tm (Statut | Interprétation | Affichage |) Tj
+/F1 9.5 Tf 1 0 0 1 50 630 Tm (SUCCESS avec relations | Recherche réussie et callers identifiés. | Nombre positif |) Tj
+/F1 9.5 Tf 1 0 0 1 50 616 Tm (SUCCESS sans relation | Recherche réussie, aucun caller. | 0 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 602 Tm (UNSUPPORTED | Le mécanisme ne peut pas analyser ce type. | - |) Tj
+/F1 9.5 Tf 1 0 0 1 50 588 Tm (NOT_FOUND | Objet absent ou mauvais couple nom/classe. | - |) Tj
+/F1 9.5 Tf 1 0 0 1 50 574 Tm (FAILED | Erreur technique ou réponse inutilisable. | - |) Tj
+/F1 9.5 Tf 1 0 0 1 50 560 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 546 Tm (15.3 Pseudo-code) Tj
+/F1 9.5 Tf 1 0 0 1 50 528 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 514 Tm (validate object name) Tj
+/F1 9.5 Tf 1 0 0 1 50 500 Tm (choose repository class) Tj
+/F1 9.5 Tf 1 0 0 1 50 486 Tm (call RS_EU_CROSSREF) Tj
+/F1 9.5 Tf 1 0 0 1 50 472 Tm (map SY-SUBRC to explicit status) Tj
+/F1 9.5 Tf 1 0 0 1 50 458 Tm (for every RSFINDLST row:) Tj
+/F1 9.5 Tf 1 0 0 1 50 444 Tm (normalize source and target) Tj
+/F1 9.5 Tf 1 0 0 1 50 430 Tm (remove repository prefixes) Tj
+/F1 9.5 Tf 1 0 0 1 50 416 Tm (reject empty or self-generated artifacts) Tj
+/F1 9.5 Tf 1 0 0 1 50 402 Tm (create typed relation) Tj
+/F1 9.5 Tf 1 0 0 1 50 388 Tm (sort relations by semantic identity) Tj
+/F1 9.5 Tf 1 0 0 1 50 374 Tm (delete adjacent duplicates) Tj
+/F1 9.5 Tf 1 0 0 1 50 360 Tm (count unique source objects) Tj
+/F1 9.5 Tf 1 0 0 1 50 346 Tm (return status, count, relations and evidence) Tj
+/F1 9.5 Tf 1 0 0 1 50 332 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 318 Tm (15.4 Exemple JSON) Tj
+/F1 9.5 Tf 1 0 0 1 50 300 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 286 Tm ({) Tj
+/F1 9.5 Tf 1 0 0 1 50 272 Tm ("objectName": "ZCAP_1_TOP",) Tj
+/F1 9.5 Tf 1 0 0 1 50 258 Tm ("objectClass": "REPS",) Tj
+/F1 9.5 Tf 1 0 0 1 50 244 Tm ("status": "SUCCESS",) Tj
+/F1 9.5 Tf 1 0 0 1 50 230 Tm ("message": "1 verified user\(s\), 1 relation\(s\)",) Tj
+/F1 9.5 Tf 1 0 0 1 50 216 Tm ("usedByCount": 1,) Tj
+/F1 9.5 Tf 1 0 0 1 50 202 Tm ("relations": [{) Tj
+/F1 9.5 Tf 1 0 0 1 50 188 Tm ("sourceName": "ZCAP_1",) Tj
+/F1 9.5 Tf 1 0 0 1 50 174 Tm ("sourceClass": "P",) Tj
+/F1 9.5 Tf 1 0 0 1 50 160 Tm ("targetName": "ZCAP_1_TOP",) Tj
+/F1 9.5 Tf 1 0 0 1 50 146 Tm ("targetClass": "I",) Tj
+/F1 9.5 Tf 1 0 0 1 50 132 Tm ("relationKind": "INCLUDES",) Tj
+/F1 9.5 Tf 1 0 0 1 50 118 Tm ("sourceLine": 22,) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 9/17) Tj
+ET
+endstream
+endobj
+22 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 21 0 R >>
+endobj
+23 0 obj
+<< /Length 3498 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm ("verified": true) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (}]) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (}) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 744 Tm (16. Construction et métriques du graphe) Tj
+/F1 9.5 Tf 1 0 0 1 50 722 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 708 Tm (16.1 Identité canonique) Tj
+/F1 9.5 Tf 1 0 0 1 50 690 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 676 Tm (Un noeud est identifié par TYPE::NOM. Le type est ramené à sa base : PROG/P et PROG/I) Tj
+/F1 9.5 Tf 1 0 0 1 50 662 Tm (deviennent des noeuds de famille PROG, tout en conservant leur nature dans l'inventaire. Les) Tj
+/F1 9.5 Tf 1 0 0 1 50 648 Tm (noms sont trimés et convertis en majuscules.) Tj
+/F1 9.5 Tf 1 0 0 1 50 634 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 620 Tm (16.2 Déduplication des arêtes) Tj
+/F1 9.5 Tf 1 0 0 1 50 602 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 588 Tm (Une arête est identifiée par source, cible et nature. Lorsque plusieurs preuves décrivent la) Tj
+/F1 9.5 Tf 1 0 0 1 50 574 Tm (même relation, leurs sources et leurs extraits sont fusionnés. Si une preuve SAP_CROSSREF) Tj
+/F1 9.5 Tf 1 0 0 1 50 560 Tm (arrive après une candidate, elle devient la provenance principale et l'arête passe à l'état) Tj
+/F1 9.5 Tf 1 0 0 1 50 546 Tm (vérifié.) Tj
+/F1 9.5 Tf 1 0 0 1 50 532 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 518 Tm (16.3 Formules des métriques) Tj
+/F1 9.5 Tf 1 0 0 1 50 500 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 486 Tm (Where Used\(X\)   = nombre de sources uniques des arêtes vérifiées vers X) Tj
+/F1 9.5 Tf 1 0 0 1 50 472 Tm (Dependencies\(X\) = nombre de cibles uniques des arêtes vérifiées depuis X) Tj
+/F1 9.5 Tf 1 0 0 1 50 458 Tm (Impact\(X\)       = fermeture transitive inverse depuis X) Tj
+/F1 9.5 Tf 1 0 0 1 50 444 Tm (Depth\(X\)        = plus longue profondeur vérifiée atteignable depuis X) Tj
+/F1 9.5 Tf 1 0 0 1 50 430 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 416 Tm (Les cycles sont recherchés uniquement dans le sous-graphe vérifié. Cela empêche une simple) Tj
+/F1 9.5 Tf 1 0 0 1 50 402 Tm (occurrence regex de fabriquer un cycle de production.) Tj
+/F1 9.5 Tf 1 0 0 1 50 388 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 374 Tm (16.4 Includes) Tj
+/F1 9.5 Tf 1 0 0 1 50 356 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 342 Tm (Pour un report principal qui inclut TOP, SS et CLA, la direction correcte est :) Tj
+/F1 9.5 Tf 1 0 0 1 50 328 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 314 Tm (ZCAP_1 --INCLUDES--> ZCAP_1_TOP) Tj
+/F1 9.5 Tf 1 0 0 1 50 300 Tm (ZCAP_1 --INCLUDES--> ZCAP_1_SS) Tj
+/F1 9.5 Tf 1 0 0 1 50 286 Tm (ZCAP_1 --INCLUDES--> ZCAP_1_CLA) Tj
+/F1 9.5 Tf 1 0 0 1 50 272 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 258 Tm (Ainsi, chacun des includes possède un Where Used égal à un si le report parent est son seul) Tj
+/F1 9.5 Tf 1 0 0 1 50 244 Tm (utilisateur. Le report principal peut avoir zéro Where Used tout en possédant trois) Tj
+/F1 9.5 Tf 1 0 0 1 50 230 Tm (Dependencies : ces deux valeurs ne se contredisent pas.) Tj
+/F1 9.5 Tf 1 0 0 1 50 216 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 202 Tm (17. ATC : exécution, performance et interprétation) Tj
+/F1 9.5 Tf 1 0 0 1 50 180 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 166 Tm (ATC ne doit pas être exécuté séparément sur tous les sous-objets techniques lorsqu'ils sont) Tj
+/F1 9.5 Tf 1 0 0 1 50 152 Tm (déjà couverts par leur objet parent. Les sous-types I, S, M, F, K et J sont donc exclus de) Tj
+/F1 9.5 Tf 1 0 0 1 50 138 Tm (la liste des cibles autonomes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 124 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 110 Tm (- Concurrence limitée à deux objets pour ATC.) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 10/17) Tj
+ET
+endstream
+endobj
+24 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 23 0 R >>
+endobj
+25 0 obj
+<< /Length 3841 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (- Concurrence limitée à quatre objets pour l'enrichissement général.) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (- Échec d'un objet isolé sans annuler automatiquement tous les autres.) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (- Classification A/B/C/D seulement lorsque le résultat ATC est exploitable.) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (- Une erreur ATC laisse la classification inconnue au lieu d'attribuer A.) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm (Priorité ATC | Points de dette | Classification utilisée |) Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm (1 | 10 | D lorsqu'au moins une erreur existe |) Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm (2 | 5 | C sans priorité 1 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 688 Tm (3 | 1 | B sans priorité 1 ou 2 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 674 Tm (Aucun finding après succès | 0 | A |) Tj
+/F1 9.5 Tf 1 0 0 1 50 660 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 646 Tm (18. Dette technique et effort) Tj
+/F1 9.5 Tf 1 0 0 1 50 624 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 610 Tm (Le score composite est normalisé sur une échelle proche de 0 à 100. Il combine les findings) Tj
+/F1 9.5 Tf 1 0 0 1 50 596 Tm (ATC, la taille, la profondeur du graphe, le type de modification et l'âge de l'objet.) Tj
+/F1 9.5 Tf 1 0 0 1 50 582 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 568 Tm (ATC normalisé    = min\(1, pointsATC / 100\)) Tj
+/F1 9.5 Tf 1 0 0 1 50 554 Tm (LOC normalisé    = min\(1, LOC / 2000\)) Tj
+/F1 9.5 Tf 1 0 0 1 50 540 Tm (Depth normalisé  = min\(1, graphDepth / 10\)) Tj
+/F1 9.5 Tf 1 0 0 1 50 526 Tm (Age normalisé    = min\(1, ageDays / 1825\)) Tj
+/F1 9.5 Tf 1 0 0 1 50 512 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 498 Tm (Debt = round\(100 * \() Tj
+/F1 9.5 Tf 1 0 0 1 50 484 Tm (0.30 * ATC_normalisé +) Tj
+/F1 9.5 Tf 1 0 0 1 50 470 Tm (0.20 * LOC_normalisé +) Tj
+/F1 9.5 Tf 1 0 0 1 50 456 Tm (0.20 * Depth_normalisé +) Tj
+/F1 9.5 Tf 1 0 0 1 50 442 Tm (0.20 * ModType_multiplier +) Tj
+/F1 9.5 Tf 1 0 0 1 50 428 Tm (0.10 * Age_normalisé\)\)) Tj
+/F1 9.5 Tf 1 0 0 1 50 414 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 400 Tm (L'effort de base est de 1, 3, 8 ou 21 story points pour A, B, C ou D. Un multiplicateur) Tj
+/F1 9.5 Tf 1 0 0 1 50 386 Tm (dépendant de la profondeur, borné à deux, augmente l'effort des objets fortement couplés.) Tj
+/F1 9.5 Tf 1 0 0 1 50 372 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 358 Tm (Gouvernance : ces coefficients sont des règles de priorisation du projet. Ils doivent être) Tj
+/F1 9.5 Tf 1 0 0 1 50 344 Tm (validés par l'entreprise avant d'être utilisés pour engager un budget ou décider) Tj
+/F1 9.5 Tf 1 0 0 1 50 330 Tm (automatiquement d'une migration.) Tj
+/F1 9.5 Tf 1 0 0 1 50 316 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 302 Tm (19. R5 : règles, priorité et explicabilité) Tj
+/F1 9.5 Tf 1 0 0 1 50 280 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 266 Tm (Le classifieur examine les preuves dans un ordre contrôlé. Une modification classique) Tj
+/F1 9.5 Tf 1 0 0 1 50 252 Tm (détectée par ATC est prioritaire. Viennent ensuite les enhancements explicites ou) Tj
+/F1 9.5 Tf 1 0 0 1 50 238 Tm (implicites, les BAdI, les wrappers et enfin le développement personnalisé par défaut.) Tj
+/F1 9.5 Tf 1 0 0 1 50 224 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 210 Tm (if ATC says modified SAP standard -> CLASSICAL_MODIFICATION / high) Tj
+/F1 9.5 Tf 1 0 0 1 50 196 Tm (else if exact implicit evidence   -> IMPLICIT_ENHANCEMENT / high) Tj
+/F1 9.5 Tf 1 0 0 1 50 182 Tm (else if ENHANCEMENT-POINT         -> EXPLICIT_ENHANCEMENT / high) Tj
+/F1 9.5 Tf 1 0 0 1 50 168 Tm (else if IF_EX_* or GET/CALL BADI  -> BADI_IMPLEMENTATION / high) Tj
+/F1 9.5 Tf 1 0 0 1 50 154 Tm (else if ZCL_IM_* naming only      -> BADI_IMPLEMENTATION / medium) Tj
+/F1 9.5 Tf 1 0 0 1 50 140 Tm (else if wrapper name + delegation -> WRAPPER_PROXY / high) Tj
+/F1 9.5 Tf 1 0 0 1 50 126 Tm (else if Z/Y namespace             -> CUSTOM_DEVELOPMENT / medium) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 11/17) Tj
+ET
+endstream
+endobj
+26 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 25 0 R >>
+endobj
+27 0 obj
+<< /Length 3236 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (else                              -> CUSTOM_DEVELOPMENT / low) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (Les commentaires ABAP sont retirés avant l'analyse afin qu'un exemple commenté ne déclenche) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (pas une classification. Une syntaxe ENHANCEMENT ambiguë ne permet pas d'inventer si le hook) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm (est implicite ou explicite : elle reçoit une confiance faible.) Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 716 Tm (20. Exercice ALV : procédure détaillée dans SAP GUI) Tj
+/F1 9.5 Tf 1 0 0 1 50 694 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 680 Tm (20.1 Baseline) Tj
+/F1 9.5 Tf 1 0 0 1 50 662 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 648 Tm (- Ouvrir le report original dans SE38 ou SE80.) Tj
+/F1 9.5 Tf 1 0 0 1 50 634 Tm (- Effectuer Ctrl+F2 pour le contrôle syntaxique.) Tj
+/F1 9.5 Tf 1 0 0 1 50 620 Tm (- Exécuter F8 avec un jeu de critères reproductible.) Tj
+/F1 9.5 Tf 1 0 0 1 50 606 Tm (- Capturer le nombre de lignes et quelques résultats métier.) Tj
+/F1 9.5 Tf 1 0 0 1 50 592 Tm (- Exécuter ATC et enregistrer les findings initiaux.) Tj
+/F1 9.5 Tf 1 0 0 1 50 578 Tm (- Ne pas corriger directement l'original.) Tj
+/F1 9.5 Tf 1 0 0 1 50 564 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 550 Tm (20.2 Création de la copie) Tj
+/F1 9.5 Tf 1 0 0 1 50 532 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 518 Tm (- Copier vers ZPROG_ALV_YME_CC.) Tj
+/F1 9.5 Tf 1 0 0 1 50 504 Tm (- Cocher Source, Text Elements et Includes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 490 Tm (- Créer les includes avec une nomenclature homogène.) Tj
+/F1 9.5 Tf 1 0 0 1 50 476 Tm (- Vérifier que le report principal référence uniquement les nouveaux includes.) Tj
+/F1 9.5 Tf 1 0 0 1 50 462 Tm (- Attribuer un package de test ou une demande de transport selon les règles du système.) Tj
+/F1 9.5 Tf 1 0 0 1 50 448 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 434 Tm (20.3 Ordre d'activation) Tj
+/F1 9.5 Tf 1 0 0 1 50 416 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 402 Tm (- TOP : types et déclaration différée.) Tj
+/F1 9.5 Tf 1 0 0 1 50 388 Tm (- SS : écran de sélection.) Tj
+/F1 9.5 Tf 1 0 0 1 50 374 Tm (- CLA : classe locale.) Tj
+/F1 9.5 Tf 1 0 0 1 50 360 Tm (- Text Pool du programme principal.) Tj
+/F1 9.5 Tf 1 0 0 1 50 346 Tm (- Report principal.) Tj
+/F1 9.5 Tf 1 0 0 1 50 332 Tm (- Ctrl+F2 global puis Ctrl+F3.) Tj
+/F1 9.5 Tf 1 0 0 1 50 318 Tm (- F8 et comparaison avec la baseline.) Tj
+/F1 9.5 Tf 1 0 0 1 50 304 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 290 Tm (21. Organisation recommandée du code ALV) Tj
+/F1 9.5 Tf 1 0 0 1 50 268 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 254 Tm (21.1 TOP) Tj
+/F1 9.5 Tf 1 0 0 1 50 236 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 222 Tm (CLASS lcl_report DEFINITION DEFERRED.) Tj
+/F1 9.5 Tf 1 0 0 1 50 208 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 194 Tm (TYPES: BEGIN OF lty_result,) Tj
+/F1 9.5 Tf 1 0 0 1 50 180 Tm (company_code        TYPE bukrs,) Tj
+/F1 9.5 Tf 1 0 0 1 50 166 Tm (document_number     TYPE belnr_d,) Tj
+/F1 9.5 Tf 1 0 0 1 50 152 Tm (fiscal_year         TYPE gjahr,) Tj
+/F1 9.5 Tf 1 0 0 1 50 138 Tm (posting_date        TYPE budat,) Tj
+/F1 9.5 Tf 1 0 0 1 50 124 Tm (document_date       TYPE bldat,) Tj
+/F1 9.5 Tf 1 0 0 1 50 110 Tm (tax_code            TYPE mwskz,) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 12/17) Tj
+ET
+endstream
+endobj
+28 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 27 0 R >>
+endobj
+29 0 obj
+<< /Length 2935 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (tax_account         TYPE saknr,) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (tax_rate            TYPE kbetr,) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (END OF lty_result.) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm (TYPES lty_result_tab TYPE STANDARD TABLE OF lty_result) Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm (WITH EMPTY KEY.) Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm (DATA go_report TYPE REF TO lcl_report.) Tj
+/F1 9.5 Tf 1 0 0 1 50 688 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 674 Tm (21.2 Sélection) Tj
+/F1 9.5 Tf 1 0 0 1 50 656 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 642 Tm (SELECTION-SCREEN BEGIN OF BLOCK b1) Tj
+/F1 9.5 Tf 1 0 0 1 50 628 Tm (WITH FRAME TITLE text-001.) Tj
+/F1 9.5 Tf 1 0 0 1 50 614 Tm (SELECT-OPTIONS:) Tj
+/F1 9.5 Tf 1 0 0 1 50 600 Tm (s_ste   FOR gv_company_code,) Tj
+/F1 9.5 Tf 1 0 0 1 50 586 Tm (s_npc   FOR gv_document_number,) Tj
+/F1 9.5 Tf 1 0 0 1 50 572 Tm (s_excpt FOR gv_fiscal_year DEFAULT '2025'.) Tj
+/F1 9.5 Tf 1 0 0 1 50 558 Tm (PARAMETERS p_ldg TYPE rldnr.) Tj
+/F1 9.5 Tf 1 0 0 1 50 544 Tm (SELECTION-SCREEN END OF BLOCK b1.) Tj
+/F1 9.5 Tf 1 0 0 1 50 530 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 516 Tm (La convention retenue utilise S_ pour SELECT-OPTIONS et P_ pour PARAMETERS. Les variables) Tj
+/F1 9.5 Tf 1 0 0 1 50 502 Tm (utilisées par FOR doivent être déclarées avant l'include SS.) Tj
+/F1 9.5 Tf 1 0 0 1 50 488 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 474 Tm (21.3 Classe locale) Tj
+/F1 9.5 Tf 1 0 0 1 50 456 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 442 Tm (CLASS lcl_report DEFINITION FINAL.) Tj
+/F1 9.5 Tf 1 0 0 1 50 428 Tm (PUBLIC SECTION.) Tj
+/F1 9.5 Tf 1 0 0 1 50 414 Tm (METHODS constructor) Tj
+/F1 9.5 Tf 1 0 0 1 50 400 Tm (IMPORTING io_tax_provider TYPE REF TO zif_yme_tax_provider.) Tj
+/F1 9.5 Tf 1 0 0 1 50 386 Tm (METHODS run.) Tj
+/F1 9.5 Tf 1 0 0 1 50 372 Tm (PRIVATE SECTION.) Tj
+/F1 9.5 Tf 1 0 0 1 50 358 Tm (DATA mt_result TYPE lty_result_tab.) Tj
+/F1 9.5 Tf 1 0 0 1 50 344 Tm (DATA mo_tax_provider TYPE REF TO zif_yme_tax_provider.) Tj
+/F1 9.5 Tf 1 0 0 1 50 330 Tm (METHODS get_data.) Tj
+/F1 9.5 Tf 1 0 0 1 50 316 Tm (METHODS enrich_data.) Tj
+/F1 9.5 Tf 1 0 0 1 50 302 Tm (METHODS show_alv.) Tj
+/F1 9.5 Tf 1 0 0 1 50 288 Tm (ENDCLASS.) Tj
+/F1 9.5 Tf 1 0 0 1 50 274 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 260 Tm (L'injection par interface évite que la classe métier construise elle-même sa dépendance) Tj
+/F1 9.5 Tf 1 0 0 1 50 246 Tm (legacy. Le programme principal choisit l'implémentation, tandis que le report consomme) Tj
+/F1 9.5 Tf 1 0 0 1 50 232 Tm (uniquement le contrat.) Tj
+/F1 9.5 Tf 1 0 0 1 50 218 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 204 Tm (22. Wrapper fiscal : code d'intégration complet) Tj
+/F1 9.5 Tf 1 0 0 1 50 182 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 168 Tm (22.1 Injection) Tj
+/F1 9.5 Tf 1 0 0 1 50 150 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 136 Tm (INITIALIZATION.) Tj
+/F1 9.5 Tf 1 0 0 1 50 122 Tm (go_report = NEW lcl_report\() Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 13/17) Tj
+ET
+endstream
+endobj
+30 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 29 0 R >>
+endobj
+31 0 obj
+<< /Length 2877 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (io_tax_provider = NEW zcl_yme_tax_legacy\( \) \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (START-OF-SELECTION.) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (go_report->run\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 730 Tm (22.2 Orchestration) Tj
+/F1 9.5 Tf 1 0 0 1 50 712 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 698 Tm (METHOD run.) Tj
+/F1 9.5 Tf 1 0 0 1 50 684 Tm (get_data\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 670 Tm (IF mt_result IS INITIAL.) Tj
+/F1 9.5 Tf 1 0 0 1 50 656 Tm (MESSAGE text-003 TYPE 'S' DISPLAY LIKE 'E'.) Tj
+/F1 9.5 Tf 1 0 0 1 50 642 Tm (RETURN.) Tj
+/F1 9.5 Tf 1 0 0 1 50 628 Tm (ENDIF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 614 Tm (enrich_data\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 600 Tm (show_alv\( \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 586 Tm (ENDMETHOD.) Tj
+/F1 9.5 Tf 1 0 0 1 50 572 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 558 Tm (22.3 Enrichissement) Tj
+/F1 9.5 Tf 1 0 0 1 50 540 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 526 Tm (METHOD enrich_data.) Tj
+/F1 9.5 Tf 1 0 0 1 50 512 Tm (LOOP AT mt_result ASSIGNING FIELD-SYMBOL\(<result>\).) Tj
+/F1 9.5 Tf 1 0 0 1 50 498 Tm (IF <result>-tax_code IS INITIAL.) Tj
+/F1 9.5 Tf 1 0 0 1 50 484 Tm (CONTINUE.) Tj
+/F1 9.5 Tf 1 0 0 1 50 470 Tm (ENDIF.) Tj
+/F1 9.5 Tf 1 0 0 1 50 456 Tm (mo_tax_provider->get_tax_data\() Tj
+/F1 9.5 Tf 1 0 0 1 50 442 Tm (EXPORTING) Tj
+/F1 9.5 Tf 1 0 0 1 50 428 Tm (iv_tax_code       = <result>-tax_code) Tj
+/F1 9.5 Tf 1 0 0 1 50 414 Tm (IMPORTING) Tj
+/F1 9.5 Tf 1 0 0 1 50 400 Tm (ev_tax_account    = <result>-tax_account) Tj
+/F1 9.5 Tf 1 0 0 1 50 386 Tm (ev_tax_rate       = <result>-tax_rate) Tj
+/F1 9.5 Tf 1 0 0 1 50 372 Tm (ev_account_found  = DATA\(lv_account_found\)) Tj
+/F1 9.5 Tf 1 0 0 1 50 358 Tm (ev_rate_found     = DATA\(lv_rate_found\) \).) Tj
+/F1 9.5 Tf 1 0 0 1 50 344 Tm (ENDLOOP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 330 Tm (ENDMETHOD.) Tj
+/F1 9.5 Tf 1 0 0 1 50 316 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 302 Tm (22.4 Remplacement futur) Tj
+/F1 9.5 Tf 1 0 0 1 50 284 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 270 Tm (Lorsque SAP fournit une API Released fonctionnellement équivalente, une classe) Tj
+/F1 9.5 Tf 1 0 0 1 50 256 Tm (ZCL_YME_TAX_RELEASED peut implémenter la même interface. Le report ne change pas ; seule) Tj
+/F1 9.5 Tf 1 0 0 1 50 242 Tm (l'instanciation est remplacée.) Tj
+/F1 9.5 Tf 1 0 0 1 50 228 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 214 Tm (23. Analyse des SELECT SINGLE) Tj
+/F1 9.5 Tf 1 0 0 1 50 192 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 178 Tm (Le finding « SELECT SINGLE is possibly not unique » signifie que le prédicat ne couvre pas) Tj
+/F1 9.5 Tf 1 0 0 1 50 164 Tm (une clé unique. Il ne faut pas le masquer sans règle métier.) Tj
+/F1 9.5 Tf 1 0 0 1 50 150 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 136 Tm (Situation | Correction |) Tj
+/F1 9.5 Tf 1 0 0 1 50 122 Tm (La clé complète est connue | Ajouter tous les champs de clé au WHERE. |) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 14/17) Tj
+ET
+endstream
+endobj
+32 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 31 0 R >>
+endobj
+33 0 obj
+<< /Length 4254 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm (Plusieurs lignes sont métierment possibles | Lire la liste et traiter explicitement la) Tj
+/F1 9.5 Tf 1 0 0 1 50 786 Tm (cardinalité. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 772 Tm (Une seule ligne doit être choisie | SELECT UP TO 1 ROWS avec ORDER BY déterministe. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 758 Tm (Lecture répétée dans LOOP | Précharger par lots ou joindre via une source Released adaptée.) Tj
+/F1 9.5 Tf 1 0 0 1 50 744 Tm (|) Tj
+/F1 9.5 Tf 1 0 0 1 50 730 Tm (Dans le wrapper fiscal, la sélection doit également considérer les dates de validité si) Tj
+/F1 9.5 Tf 1 0 0 1 50 716 Tm (elles appartiennent réellement à la source utilisée. L'erreur rencontrée sur DATAB a montré) Tj
+/F1 9.5 Tf 1 0 0 1 50 702 Tm (qu'il ne faut jamais supposer qu'un champ existe dans A003 sans vérifier le dictionnaire du) Tj
+/F1 9.5 Tf 1 0 0 1 50 688 Tm (système.) Tj
+/F1 9.5 Tf 1 0 0 1 50 674 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 660 Tm (24. Matrice de tests) Tj
+/F1 9.5 Tf 1 0 0 1 50 638 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 624 Tm (ID | Scénario | Résultat attendu |) Tj
+/F1 9.5 Tf 1 0 0 1 50 610 Tm (DG-01 | Include avec un report parent | Where Used = 1, relation INCLUDES vérifiée |) Tj
+/F1 9.5 Tf 1 0 0 1 50 596 Tm (DG-02 | Objet sans caller après SUCCESS | Where Used = 0 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 582 Tm (DG-03 | Provider indisponible | Tiret ou statut failed, jamais zéro confirmé |) Tj
+/F1 9.5 Tf 1 0 0 1 50 568 Tm (DG-04 | Relation regex sans SAP_CROSSREF | Candidate, aucun impact métrique |) Tj
+/F1 9.5 Tf 1 0 0 1 50 554 Tm (DG-05 | Composant généré de classe | Pas de faux caller de la classe racine |) Tj
+/F1 9.5 Tf 1 0 0 1 50 540 Tm (DG-06 | Deux preuves pour la même arête | Une seule arête avec preuves fusionnées |) Tj
+/F1 9.5 Tf 1 0 0 1 50 526 Tm (R5-01 | Finding modification standard | CLASSICAL_MODIFICATION / high |) Tj
+/F1 9.5 Tf 1 0 0 1 50 512 Tm (R5-02 | INTERFACES IF_EX_* | BADI_IMPLEMENTATION / high |) Tj
+/F1 9.5 Tf 1 0 0 1 50 498 Tm (R5-03 | Nom wrapper avec délégation | WRAPPER_PROXY / high |) Tj
+/F1 9.5 Tf 1 0 0 1 50 484 Tm (R5-04 | Objet Z standard sans signal | CUSTOM_DEVELOPMENT / medium |) Tj
+/F1 9.5 Tf 1 0 0 1 50 470 Tm (ALV-01 | Ctrl+F2 sur la copie | Aucune erreur syntaxique |) Tj
+/F1 9.5 Tf 1 0 0 1 50 456 Tm (ALV-02 | F8 avec baseline | Même résultat fonctionnel |) Tj
+/F1 9.5 Tf 1 0 0 1 50 442 Tm (TAX-01 | Code TVA D1 | Compte 4366100000, taux 18, flags X |) Tj
+/F1 9.5 Tf 1 0 0 1 50 428 Tm (ATC-01 | Text Pool activé | Disparition des findings texte concernés |) Tj
+/F1 9.5 Tf 1 0 0 1 50 414 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 400 Tm (25. Diagnostic des incidents) Tj
+/F1 9.5 Tf 1 0 0 1 50 378 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 364 Tm (Symptôme | Cause probable | Action |) Tj
+/F1 9.5 Tf 1 0 0 1 50 350 Tm (Le graphe est vide | Cache ancien/incompatible ou scan partiel | Recharger l'extension et) Tj
+/F1 9.5 Tf 1 0 0 1 50 336 Tm (relancer un scan complet |) Tj
+/F1 9.5 Tf 1 0 0 1 50 322 Tm (Le scan semble disparaître en changeant d'onglet | État UI non restauré | Vérifier la barre) Tj
+/F1 9.5 Tf 1 0 0 1 50 308 Tm (globale et les messages scanProgress |) Tj
+/F1 9.5 Tf 1 0 0 1 50 294 Tm (Zéro inhabituel | Succès réellement vide ou mauvaise classe Repository | Contrôler status,) Tj
+/F1 9.5 Tf 1 0 0 1 50 280 Tm (message, objectClass et relations JSON |) Tj
+/F1 9.5 Tf 1 0 0 1 50 266 Tm (Beaucoup de dépendances fausses | Candidate edges activé | Désactiver l'option et examiner) Tj
+/F1 9.5 Tf 1 0 0 1 50 252 Tm (SAP Verified |) Tj
+/F1 9.5 Tf 1 0 0 1 50 238 Tm (ATC très long | Trop de cibles ou variante lourde | Exclure les sous-objets, réduire) Tj
+/F1 9.5 Tf 1 0 0 1 50 224 Tm (l'échantillon, utiliser la variante validée |) Tj
+/F1 9.5 Tf 1 0 0 1 50 210 Tm (Ancienne interface après compilation | Extension Host non rechargé | Developer: Reload) Tj
+/F1 9.5 Tf 1 0 0 1 50 196 Tm (Window ou relancer F5 |) Tj
+/F1 9.5 Tf 1 0 0 1 50 182 Tm (No values found sur un CDS | Successeur non équivalent ou filtres incorrects | Comparer) Tj
+/F1 9.5 Tf 1 0 0 1 50 168 Tm (modèle, données et sémantique ; ne pas forcer le remplacement |) Tj
+/F1 9.5 Tf 1 0 0 1 50 154 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 140 Tm (26. Checklist de mise en production) Tj
+/F1 9.5 Tf 1 0 0 1 50 118 Tm () Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 15/17) Tj
+ET
+endstream
+endobj
+34 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 33 0 R >>
+endobj
+35 0 obj
+<< /Length 3509 >>
+stream
+BT
+/F2 11 Tf 1 0 0 1 50 800 Tm (26.1 Sécurité) Tj
+/F1 9.5 Tf 1 0 0 1 50 782 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 768 Tm (- Protéger l'endpoint /zacore/dependencies par authentification et autorisations adaptées.) Tj
+/F1 9.5 Tf 1 0 0 1 50 754 Tm (- Ne jamais journaliser les mots de passe ou secrets SAP.) Tj
+/F1 9.5 Tf 1 0 0 1 50 740 Tm (- Utiliser HTTPS avec un certificat reconnu.) Tj
+/F1 9.5 Tf 1 0 0 1 50 726 Tm (- Limiter l'accès Repository selon les rôles de l'utilisateur technique.) Tj
+/F1 9.5 Tf 1 0 0 1 50 712 Tm (- Tracer les erreurs sans exposer le source ABAP sensible.) Tj
+/F1 9.5 Tf 1 0 0 1 50 698 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 684 Tm (26.2 Performance) Tj
+/F1 9.5 Tf 1 0 0 1 50 666 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 652 Tm (- Valider les limites de concurrence avec l'équipe Basis.) Tj
+/F1 9.5 Tf 1 0 0 1 50 638 Tm (- Mesurer le temps moyen et le taux d'échec sur un package pilote.) Tj
+/F1 9.5 Tf 1 0 0 1 50 624 Tm (- Prévoir reprise, timeout, backoff et cache selon la charge.) Tj
+/F1 9.5 Tf 1 0 0 1 50 610 Tm (- Éviter ATC complet synchrone pour des milliers d'objets.) Tj
+/F1 9.5 Tf 1 0 0 1 50 596 Tm (- Prévoir scan incrémental par date ou transport.) Tj
+/F1 9.5 Tf 1 0 0 1 50 582 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 568 Tm (26.3 Qualité des données) Tj
+/F1 9.5 Tf 1 0 0 1 50 550 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 536 Tm (- Afficher date, système, client et version du scan.) Tj
+/F1 9.5 Tf 1 0 0 1 50 522 Tm (- Ne mélanger ni environnements ni clients SAP dans le même cache.) Tj
+/F1 9.5 Tf 1 0 0 1 50 508 Tm (- Conserver la provenance de chaque arête.) Tj
+/F1 9.5 Tf 1 0 0 1 50 494 Tm (- Auditer un échantillon contre SAP GUI.) Tj
+/F1 9.5 Tf 1 0 0 1 50 480 Tm (- Définir un seuil de couverture avant usage décisionnel.) Tj
+/F1 9.5 Tf 1 0 0 1 50 466 Tm () Tj
+/F2 11 Tf 1 0 0 1 50 452 Tm (26.4 Transport et gouvernance) Tj
+/F1 9.5 Tf 1 0 0 1 50 434 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 420 Tm (- Déplacer les objets depuis $TMP vers un package transportable.) Tj
+/F1 9.5 Tf 1 0 0 1 50 406 Tm (- Créer une demande dédiée et documentée.) Tj
+/F1 9.5 Tf 1 0 0 1 50 392 Tm (- Séparer objets backend SAP, extension VS Code et configuration.) Tj
+/F1 9.5 Tf 1 0 0 1 50 378 Tm (- Faire valider le wrapper legacy par l'architecture Clean Core.) Tj
+/F1 9.5 Tf 1 0 0 1 50 364 Tm (- Créer une date de révision pour chaque exception non Released.) Tj
+/F1 9.5 Tf 1 0 0 1 50 350 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 336 Tm (27. Livrables réalisés) Tj
+/F1 9.5 Tf 1 0 0 1 50 314 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 300 Tm (- extension A-CorePilot compilable ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 286 Tm (- inventaire des objets et statuts where-used ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 272 Tm (- provider SAP de dépendances et service HTTP ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 258 Tm (- graphe vérifié avec candidats séparés ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 244 Tm (- cache résilient et scans protégés ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 230 Tm (- classifieur R5 déterministe ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 216 Tm (- tests TypeScript du graphe et de R5 ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 202 Tm (- copie ZPROG_ALV_YME_CC et ses includes ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 188 Tm (- Text Pool français ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 174 Tm (- modernisation SALV ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 160 Tm (- analyse Cloudification Repository ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 146 Tm (- interface et classe wrapper fiscal ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 132 Tm (- preuve fonctionnelle D1 ;) Tj
+/F1 9.5 Tf 1 0 0 1 50 118 Tm (- comparaison avant/après et limites documentées.) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 16/17) Tj
+ET
+endstream
+endobj
+36 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 35 0 R >>
+endobj
+37 0 obj
+<< /Length 2885 >>
+stream
+BT
+/F1 9.5 Tf 1 0 0 1 50 800 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 786 Tm (28. Glossaire) Tj
+/F1 9.5 Tf 1 0 0 1 50 764 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 750 Tm (Terme | Définition |) Tj
+/F1 9.5 Tf 1 0 0 1 50 736 Tm (ADT | ABAP Development Tools et services HTTP utilisés par les outils de développement. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 722 Tm (ATC | ABAP Test Cockpit, moteur de contrôles syntaxiques, qualité et cloudification. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 708 Tm (Caller / Used By | Objet qui utilise l'objet analysé ; relation entrante. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 694 Tm (Dependency | Objet utilisé par l'objet analysé ; relation sortante. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 680 Tm (Clean Core | Approche visant à réduire les modifications du standard et à consommer des) Tj
+/F1 9.5 Tf 1 0 0 1 50 666 Tm (contrats stables. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 652 Tm (Released API | Objet explicitement publié par SAP pour un scénario et un contrat d'usage. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 638 Tm (Wrapper | Classe qui cache un composant legacy derrière une interface stable. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 624 Tm (Candidate | Relation plausible mais non confirmée par le provider Repository. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 610 Tm (SAP Verified | Relation confirmée par la source SAP_CROSSREF du projet. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 596 Tm (Impact transitif | Ensemble des utilisateurs directs et indirects potentiellement affectés.) Tj
+/F1 9.5 Tf 1 0 0 1 50 582 Tm (|) Tj
+/F1 9.5 Tf 1 0 0 1 50 568 Tm (CRV | Cloudification Repository Viewer, utilisé pour rechercher statut et successeur. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 554 Tm (R5 | Dimension de risque liée au type de modification ou d'extension. |) Tj
+/F1 9.5 Tf 1 0 0 1 50 540 Tm () Tj
+/F2 14 Tf 1 0 0 1 50 526 Tm (29. Conclusion) Tj
+/F1 9.5 Tf 1 0 0 1 50 504 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 490 Tm (A-CorePilot est passé d'un prototype aux compteurs difficiles à interpréter vers une chaîne) Tj
+/F1 9.5 Tf 1 0 0 1 50 476 Tm (où la provenance des relations est visible et où seules les preuves SAP vérifiées) Tj
+/F1 9.5 Tf 1 0 0 1 50 462 Tm (influencent les métriques. L'exercice ALV a appliqué une migration progressive : préserver) Tj
+/F1 9.5 Tf 1 0 0 1 50 448 Tm (l'original, stabiliser une copie, corriger les problèmes, rechercher et tester les APIs) Tj
+/F1 9.5 Tf 1 0 0 1 50 434 Tm (Released, puis isoler la dette non remplaçable.) Tj
+/F1 9.5 Tf 1 0 0 1 50 420 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 406 Tm (Le résultat n'est pas présenté comme une conformité Clean Core absolue. Il constitue une) Tj
+/F1 9.5 Tf 1 0 0 1 50 392 Tm (base auditable, testable et évolutive dont les limites sont documentées.) Tj
+/F1 9.5 Tf 1 0 0 1 50 378 Tm () Tj
+/F1 9.5 Tf 1 0 0 1 50 364 Tm (Rapport généré à partir des travaux réalisés dans le workspace A-CorePilot et des) Tj
+/F1 9.5 Tf 1 0 0 1 50 350 Tm (validations effectuées dans SAP Logon.) Tj
+/F1 8 Tf 1 0 0 1 500 25 Tm (Page 17/17) Tj
+ET
+endstream
+endobj
+38 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 37 0 R >>
+endobj
+xref
+0 39
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000233 00000 n 
+0000000330 00000 n 
+0000000432 00000 n 
+0000004633 00000 n 
+0000004769 00000 n 
+0000008824 00000 n 
+0000008960 00000 n 
+0000012291 00000 n 
+0000012428 00000 n 
+0000015972 00000 n 
+0000016110 00000 n 
+0000019322 00000 n 
+0000019460 00000 n 
+0000023288 00000 n 
+0000023426 00000 n 
+0000027585 00000 n 
+0000027723 00000 n 
+0000031846 00000 n 
+0000031984 00000 n 
+0000034984 00000 n 
+0000035122 00000 n 
+0000038673 00000 n 
+0000038811 00000 n 
+0000042705 00000 n 
+0000042843 00000 n 
+0000046132 00000 n 
+0000046270 00000 n 
+0000049258 00000 n 
+0000049396 00000 n 
+0000052326 00000 n 
+0000052464 00000 n 
+0000056771 00000 n 
+0000056909 00000 n 
+0000060471 00000 n 
+0000060609 00000 n 
+0000063547 00000 n 
+trailer
+<< /Size 39 /Root 1 0 R >>
+startxref
+63685
+%%EOF

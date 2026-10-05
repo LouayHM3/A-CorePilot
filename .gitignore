@@ -17,6 +17,9 @@ webview-ui/node_modules/
 
 # ─── A-CorePilot Runtime Data (per-workspace, gitignored by design) ──
 .corepilot/
+.edge-pdf-profile/
+.tmp-edge-acore/
+.tmp-edge-pdf/
 
 # ─── OS ─────────────────────────────────────────────────────────────
 .DS_Store

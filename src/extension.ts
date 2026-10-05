@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { SecretStorageService } from './services/SecretStorageService';
 import { SettingsService } from './services/SettingsService';
 import { SidebarProvider } from './ui/sidebar/SidebarProvider';
@@ -7,6 +8,7 @@ import { ScannerAgent } from './agents/ScannerAgent';
 import { CrvDatastore } from './crv/CrvDatastore';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  ScannerAgent.initializeStorage(path.join(context.globalStorageUri.fsPath, 'scanner'));
   const secretStorage = new SecretStorageService(context.secrets);
   const sidebar = new SidebarProvider(context);
 
